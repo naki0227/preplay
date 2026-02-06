@@ -77,6 +77,31 @@ class GameSuggestionView extends StatelessWidget {
                     child: const Text('閉じる', style: TextStyle(color: CupertinoColors.secondaryLabel)),
                     onPressed: () => SystemNavigator.pop(),
                   ),
+                  // AI Generation Button
+                  if (!game.id.startsWith('ai_'))
+                    CupertinoButton(
+                      minSize: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(CupertinoIcons.sparkles, size: 14, color: CupertinoColors.systemIndigo),
+                          const SizedBox(width: 4),
+                          Text(
+                            'AIでこの場の遊びを作る',
+                            style: TextStyle(
+                              color: CupertinoColors.systemIndigo.resolveFrom(context),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        context.read<PreplayController>().generateWithAI();
+                      },
+                    ),
                 ],
               ),
               const SizedBox(height: 48),

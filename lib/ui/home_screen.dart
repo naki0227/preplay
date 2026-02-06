@@ -22,25 +22,29 @@ class HomeScreen extends StatelessWidget {
             colors: [AppColors.bgStart, AppColors.bgEnd],
           ),
         ),
-        child: ListenableBuilder(
-          listenable: context.read<PreplayController>(),
-          builder: (context, _) {
-            final controller = context.read<PreplayController>();
-            
+        child: Consumer<PreplayController>(
+          builder: (context, controller, child) {
             return AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: controller.state == PreplayState.detecting
-                  ? const DetectingView(key: ValueKey('detecting'))
-                  : GameSuggestionView(
-                      key: const ValueKey('suggested'),
-                      game: controller.currentGame!,
-                    ),
+              duration: const Duration(milliseconds: 500),
+              child: _buildContent(context, controller),
             );
           },
         ),
       ),
     );
+  }
+
+  Widget _buildContent(BuildContext context, PreplayController controller) {
+    switch (controller.state) {
+      case PreplayState.detecting:
+        return const DetectingView();
+      case PreplayState.thinking:
+        return const DetectingView(message: 'AIが新しい遊びを生成中...\n(10秒ほどかかります)');
+      case PreplayState.suggested:
+        if (controller.currentGame != null) {
+          return GameSuggestionView(game: controller.currentGame!, key: ValueKey(controller.currentGame!.id));
+        }
+        return const DetectingView();
+    }
   }
 }

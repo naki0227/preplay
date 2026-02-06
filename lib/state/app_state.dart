@@ -1,15 +1,18 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/game_model.dart';
 import '../services/saved_games_service.dart';
+import '../services/situation_service.dart';
+import '../services/ai_service.dart';
 
-enum PreplayState { detecting, suggested }
+enum PreplayState { detecting, suggested, thinking } // Added "thinking"
 
 class PreplayController extends ChangeNotifier {
   PreplayState _state = PreplayState.detecting;
   GameModel? _currentGame;
   final SavedGamesService _savedGamesService = SavedGamesService();
+  final SituationService _situationService = SituationService();
+  final AiService _aiService = AiService();
   List<String> _savedIds = [];
   
   PreplayState get state => _state;
@@ -46,20 +49,44 @@ class PreplayController extends ChangeNotifier {
     _state = PreplayState.detecting;
     notifyListeners();
 
-    // 0.8秒（0.5秒より少しゆったり）かけてセンサーを模倣
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    _matchGameBySituation();
+    // 0.8秒（0.5秒より少しゆったり）かけてセンサーを模倣... ではなく本当に取得！
+    // 演出のための最低0.8秒 + 実際の処理時間
+    final minWait = Future.delayed(const Duration(milliseconds: 800));
+    final contextFuture = _situationService.determineContext();
+    
+    // 両方終わるのを待つ
+    final results = await Future.wait([minWait, contextFuture]);
+    final detectedTags = results[1] as List<String>;
+    
+    _matchGameByContext(detectedTags);
   }
 
-  void _matchGameBySituation() {
-    // 【モックロジック】本来はここでGPSや時間、騒音レベルを取得
-    // 例：現在は「18:00」「静かな場所」と仮定
-    const mockSituation = 'quiet'; 
+  // AI Generation
+  Future<void> generateWithAI() async {
+    _state = PreplayState.thinking;
+    notifyListeners();
 
+    // Get real context again or use cached? Let's get fresh.
+    final contextTags = await _situationService.determineContext();
+    final generatedGame = await _aiService.generateGame(contextTags);
+
+    if (generatedGame != null) {
+      _currentGame = generatedGame;
+      _state = PreplayState.suggested;
+    } else {
+      // Fallback if AI fails: just pick random
+      next();
+    }
+    notifyListeners();
+  }
+
+  void _matchGameByContext(List<String> tags) {
+    // タグにマッチするゲームをフィルタリング
+    // tagsリストのいずれか1つでも持っていれば候補とする（OR条件）
+    // ただし 'all' は常に許可
     final availableGames = GameModel.mvpGames.where((game) {
-      // 状況タグに合致するもの、または全状況OKなものをフィルタリング
-      return game.tags.contains(mockSituation) || game.tags.contains('all');
+      if (game.tags.contains('all')) return true;
+      return tags.any((t) => game.tags.contains(t));
     }).toList();
 
     // availableGamesが空の場合は全件から選ぶ安全策

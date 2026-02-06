@@ -1,9 +1,24 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
 import 'state/app_state.dart';
 import 'ui/home_screen.dart';
+import 'theme/app_colors.dart';
+import 'services/ai_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: ".env");
+    AiService().init();
+  } catch (e) {
+    print("Env load failed: $e");
+    // Proceed without AI (MVP fallback)
+  }
+  
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+));
   runApp(const PreplayApp());
 }
 
