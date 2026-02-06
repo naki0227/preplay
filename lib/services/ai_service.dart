@@ -1,69 +1,66 @@
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/game_model.dart';
-import 'situation_service.dart';
 
 class AiService {
   static final AiService _instance = AiService._internal();
   factory AiService() => _instance;
   AiService._internal();
 
-  GenerativeModel? _model;
+  String? _backendUrl;
+  String? _apiSecret;
 
   void init() {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey != null && apiKey != 'YOUR_API_KEY_HERE') {
-      _model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
-    } else {
-      print('Gemini API Key missing or invalid.');
+    _backendUrl = dotenv.env['BACKEND_URL'];
+    _apiSecret = dotenv.env['API_SECRET'];
+    
+    if (_backendUrl == null || _backendUrl!.isEmpty) {
+      print('BACKEND_URL is not set in .env');
     }
   }
 
   Future<GameModel?> generateGame(List<String> contextTags) async {
-    if (_model == null) {
-      print('AI Model not initialized.');
+    if (_backendUrl == null || _backendUrl!.isEmpty) {
+      print('Backend URL not configured.');
       return null;
     }
-
-    final prompt = '''
-    Create a unique, short, equipment-free game logic for a group of people in this context: ${contextTags.join(', ')}.
-    Output strictly in this JSON format (no markdown):
-    {
-      "title": "Game Title (Japanese)",
-      "origin": "AI Generated",
-      "rules": "3 lines of rules in Japanese. Short and punchy.",
-      "tags": ["${contextTags.join('", "')}"]
-    }
-    ''';
 
     try {
-      final content = [Content.text(prompt)];
-      final response = await _model!.generateContent(content);
-      final text = response.text;
-      
-      if (text == null) return null;
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/generate'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (_apiSecret != null && _apiSecret!.isNotEmpty)
+            'Authorization': 'Bearer $_apiSecret',
+        },
+        body: jsonEncode({
+          'tags': contextTags,
+          'groupSize': 2, // Default group size
+        }),
+      );
 
-      // Simple parsing (robustness would need JSON parser, but for MVP/V2 prototype we do manual extraction or assume structure)
-      // Since response might contain Markdown ```json ... ```, we clean it.
-      final cleanText = text.replaceAll('```json', '').replaceAll('```', '').trim();
-      
-      // We need a proper JSON parser, but let's try to pass it to a helper or just regex it for simplicity in prototype
-      // Or simply return a GameModel with raw text if JSON fails.
-      // For this "SpeedRun", let's use a regex to extract fields.
-      
-      final titleMatch = RegExp(r'"title":\s*"(.*?)"').firstMatch(cleanText);
-      final rulesMatch = RegExp(r'"rules":\s*"(.*?)"').firstMatch(cleanText);
-      
-      if (titleMatch != null && rulesMatch != null) {
-         return GameModel(
-           id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
-           title: titleMatch.group(1) ?? 'Unknown',
-           origin: 'AI (${contextTags.join(',')})',
-           rules: rulesMatch.group(1)?.replaceAll(r'\n', '\n') ?? '...',
-           tags: contextTags,
-         );
+      if (response.statusCode != 200) {
+        print('Backend error: ${response.statusCode} - ${response.body}');
+        return null;
       }
-      return null;
+
+      final data = jsonDecode(response.body);
+      final gameText = data['game'] as String?;
+
+      if (gameText == null) return null;
+
+      // Parse the game text (format: "ゲーム名: ...\n---\n遊び方: ...")
+      final titleMatch = RegExp(r'ゲーム名:\s*(.+)').firstMatch(gameText);
+      final rulesMatch = RegExp(r'遊び方:\s*([\s\S]+?)(?:---|ポイント:|$)').firstMatch(gameText);
+
+      return GameModel(
+        id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
+        title: titleMatch?.group(1)?.trim() ?? 'AIゲーム',
+        origin: 'AI (${contextTags.join(',')})',
+        rules: rulesMatch?.group(1)?.trim() ?? gameText,
+        tags: contextTags,
+      );
     } catch (e) {
       print('AI Gen Error: $e');
       return null;
