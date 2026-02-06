@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 // import 'package:geolocator/geolocator.dart'; // Commented out for now to ensure MVP stability first if needed, but we will use it.
 import 'package:geolocator/geolocator.dart';
 import 'package:noise_meter/noise_meter.dart';
@@ -40,7 +42,24 @@ class SituationService {
     
     // 1. Location / Speed (Walking check)
     try {
-      if (await Permission.location.request().isGranted) {
+      bool hasLocationPermission = false;
+      if (Platform.isMacOS) {
+         // macOS: permission_handler might fail, rely on Geolocator's internal check or assume handled by OS
+         final status = await Geolocator.checkPermission();
+         hasLocationPermission = status == LocationPermission.always || status == LocationPermission.whileInUse;
+         if (status == LocationPermission.denied) {
+            // Try request via Geolocator directly if possible, or just skip
+            final requestStatus = await Geolocator.requestPermission();
+             hasLocationPermission = requestStatus == LocationPermission.always || requestStatus == LocationPermission.whileInUse;
+         }
+      } else {
+         // Mobile: Use permission_handler
+         if (await Permission.location.request().isGranted) {
+          hasLocationPermission = true;
+         }
+      }
+
+      if (hasLocationPermission) {
         Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.medium);
         
@@ -60,16 +79,22 @@ class SituationService {
     // 2. Accelerometer (Motion intensity check) - skipping for macOS desktop usually, but good for iOS
     // Simple check: listen for 200ms
     try {
-      final stream = userAccelerometerEventStream();
-      final event = await stream.first.timeout(const Duration(milliseconds: 300));
-      
-      // Magnitude of acceleration (excluding gravity)
-      double magnitude = event.x.abs() + event.y.abs() + event.z.abs();
-      
-      if (magnitude > 3.0) {
-        tags.add('active'); // Shaking or moving
+      // sensors_plus might be missing on macOS
+      if (!Platform.isMacOS) {
+        final stream = userAccelerometerEventStream();
+        final event = await stream.first.timeout(const Duration(milliseconds: 300));
+        
+        // Magnitude of acceleration (excluding gravity)
+        double magnitude = event.x.abs() + event.y.abs() + event.z.abs();
+        
+        if (magnitude > 3.0) {
+          tags.add('active'); // Shaking or moving
+        } else {
+          tags.add('quiet'); // Still
+        }
       } else {
-        tags.add('quiet'); // Still
+        // On macOS/Simulator, we might default to 'quiet' or 'waiting'
+        tags.add('quiet');
       }
     } catch (e) {
       print('Accelerometer error (expected on macOS): $e');
