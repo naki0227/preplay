@@ -15,7 +15,13 @@ class AppColors {
   // Warm Paper Theme
   static const bgStart = Color(0xFFFDFBF7); // Warm Cream
   static const bgEnd = Color(0xFFF5F0E6); // Slightly darker beige
+  static const background = bgStart;
   
   static const cardBackground = Color(0xFFFFFFFF);
   static const cardShadow = Color(0x1A5D4037); // Warm brown shadow
+  
+  // Aliases for compatibility
+  static const primary = tintColor;
+  static const textMain = label;
+  static const textSecondary = secondaryLabel;
 }

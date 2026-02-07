@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>移動速度を検知して、状況に合った遊びを提案するために使用します。（例：車移動中など）</string>
+	<key>NSMotionUsageDescription</key>
+	<string>歩行状態を検知して、立ち止まっているか歩いているかを判断するために使用します。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>周囲の騒音レベルを検知して、静かな場所か賑やかな場所かを判断するために使用します。録音は行いません。</string>
 </dict>
 </plist>

@@ -23,4 +23,8 @@ class AppText {
     color: AppColors.secondaryLabel,
     letterSpacing: 1.0, // Spaced out for elegance
   );
+  
+  // Additional Styles
+  static TextStyle get heading => title.copyWith(fontSize: 24);
+  static TextStyle get bodyBold => body.copyWith(fontWeight: FontWeight.w700);
 }

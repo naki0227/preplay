@@ -4,17 +4,16 @@
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "build": "tsc",
     "deploy": "vercel --prod"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "dotenv": "^17.2.4",
+    "@upstash/ratelimit": "^2.0.1",
+    "@upstash/redis": "^1.28.0",
     "hono": "^4.11.7"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "vercel": "^33.0.0"
+    "typescript": "^5.0.0"
   }
 }

@@ -13,100 +13,113 @@ class GameSuggestionView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
-              // Game Card
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(32.0),
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.systemBackground.resolveFrom(context),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: CupertinoColors.systemGrey.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(game.title, style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle),
-                        const SizedBox(height: 4),
-                        Text(game.origin, style: const TextStyle(color: CupertinoColors.secondaryLabel, fontSize: 13)),
-                        const SizedBox(height: 24),
-                        Text(game.rules, textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, height: 1.5)),
-                      ],
-                    ),
-                  ),
-                  // Save Button (Heart)
-                  Positioned(
-                    top: -12,
-                    right: -12,
-                    child: _SaveButton(gameId: game.id),
-                  ),
-                ],
-              ),
-              const Spacer(flex: 2),
-              // Action Buttons
-              Column(
-                children: [
-                  _ActionButton(
-                    label: 'やる',
-                    onPressed: () => HapticFeedback.mediumImpact(),
-                    isPrimary: true,
-                  ),
-                  const SizedBox(height: 12),
-                  _ActionButton(
-                    label: '次',
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      context.read<PreplayController>().next();
-                    },
-                    isPrimary: false,
-                  ),
-                  CupertinoButton(
-                    child: const Text('閉じる', style: TextStyle(color: CupertinoColors.secondaryLabel)),
-                    onPressed: () => SystemNavigator.pop(),
-                  ),
-                  // AI Generation Button
-                  if (!game.id.startsWith('ai_'))
-                    CupertinoButton(
-                      minSize: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 60), // Top spacing instead of Spacer
+                      // Game Card
+                      Stack(
+                        clipBehavior: Clip.none,
                         children: [
-                          const Icon(CupertinoIcons.sparkles, size: 14, color: CupertinoColors.systemIndigo),
-                          const SizedBox(width: 4),
-                          Text(
-                            'AIでこの場の遊びを作る',
-                            style: TextStyle(
-                              color: CupertinoColors.systemIndigo.resolveFrom(context),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                          Container(
+                            padding: const EdgeInsets.all(32.0),
+                            decoration: BoxDecoration(
+                              color: CupertinoColors.systemBackground.resolveFrom(context),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: CupertinoColors.systemGrey.withOpacity(0.1),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
                             ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(game.title, style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle),
+                                const SizedBox(height: 4),
+                                Text(game.origin, style: const TextStyle(color: CupertinoColors.secondaryLabel, fontSize: 13)),
+                                const SizedBox(height: 24),
+                                Text(game.rules, textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, height: 1.5)),
+                              ],
+                            ),
+                          ),
+                          // Save Button (Heart)
+                          Positioned(
+                            top: -12,
+                            right: -12,
+                            child: _SaveButton(game: game),
                           ),
                         ],
                       ),
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        context.read<PreplayController>().generateWithAI();
-                      },
-                    ),
-                ],
+                      const SizedBox(height: 32), // Spacing between card and buttons
+                      // Action Buttons
+                      Column(
+                        children: [
+                          _ActionButton(
+                            label: 'やる',
+                            onPressed: () {
+                              HapticFeedback.mediumImpact();
+                              context.read<PreplayController>().playGame();
+                            },
+                            isPrimary: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _ActionButton(
+                            label: '次',
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              context.read<PreplayController>().next();
+                            },
+                            isPrimary: false,
+                          ),
+                          CupertinoButton(
+                            child: const Text('閉じる', style: TextStyle(color: CupertinoColors.secondaryLabel)),
+                            onPressed: () => SystemNavigator.pop(),
+                          ),
+                          // AI Generation Button
+                          if (!game.id.startsWith('ai_'))
+                            CupertinoButton(
+                              minSize: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(CupertinoIcons.sparkles, size: 14, color: CupertinoColors.systemIndigo),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'AIでこの場の遊びを作る',
+                                    style: TextStyle(
+                                      color: CupertinoColors.systemIndigo.resolveFrom(context),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                context.read<PreplayController>().generateWithAI();
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 24), // Bottom spacing
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 48),
-            ],
-          ),
+            );
+          },
         ),
         // Library Button
         Positioned(
@@ -186,19 +199,19 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _SaveButton extends StatelessWidget {
-  final String gameId;
-  const _SaveButton({required this.gameId});
+  final GameModel game;
+  const _SaveButton({required this.game});
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<PreplayController>();
-    final isSaved = controller.isSaved(gameId);
+    final isSaved = controller.isSaved(game.id);
 
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: () {
         HapticFeedback.selectionClick();
-        controller.toggleSave(gameId);
+        controller.toggleSave(game);
       },
       child: Container(
         padding: const EdgeInsets.all(12),

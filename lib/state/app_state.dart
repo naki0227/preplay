@@ -1,109 +1,173 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/game_model.dart';
-import '../services/saved_games_service.dart';
+import '../data/game_repository.dart';
 import '../services/situation_service.dart';
-import '../services/ai_service.dart';
 
-enum PreplayState { detecting, suggested, thinking } // Added "thinking"
+enum PreplayState { detecting, suggested, thinking, playing }
 
 class PreplayController extends ChangeNotifier {
   PreplayState _state = PreplayState.detecting;
   GameModel? _currentGame;
-  final SavedGamesService _savedGamesService = SavedGamesService();
+  String? _currentTopic;
+  
+  final GameRepository _gameRepository = GameRepository();
   final SituationService _situationService = SituationService();
-  final AiService _aiService = AiService();
-  List<String> _savedIds = [];
+  
+  bool _isCommunityLoading = false;
   
   PreplayState get state => _state;
   GameModel? get currentGame => _currentGame;
-  List<String> get savedIds => _savedIds;
+  String? get currentTopic => _currentTopic;
+  
+  // Delegate to Repository
+  List<GameModel> get savedGames => _gameRepository.savedGames;
+  List<GameModel> get communityGames => _gameRepository.communityGames;
+  String? get communityError => _gameRepository.communityError;
+  bool get isCommunityLoading => _isCommunityLoading;
 
   PreplayController() {
-    _loadSavedGames();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _gameRepository.loadSavedGames();
+    loadCommunityGames();
     startDetection();
   }
 
-  Future<void> _loadSavedGames() async {
-    _savedIds = await _savedGamesService.loadSavedIds();
+  Future<void> loadCommunityGames() async {
+    _isCommunityLoading = true;
+    notifyListeners();
+    await _gameRepository.loadCommunityGames();
+    _isCommunityLoading = false;
     notifyListeners();
   }
 
-  Future<void> toggleSave(String gameId) async {
-    if (_savedIds.contains(gameId)) {
-      await _savedGamesService.removeId(gameId);
-      _savedIds.remove(gameId);
-    } else {
-      await _savedGamesService.saveId(gameId);
-      _savedIds.add(gameId);
-    }
+  Future<bool> shareGame(GameModel game) async {
+    final success = await _gameRepository.shareGame(game);
+    notifyListeners();
+    return success;
+  }
+
+  bool isGameShared(GameModel game) {
+    return _gameRepository.isGameShared(game);
+  }
+
+  Future<void> toggleSave(GameModel game) async {
+    await _gameRepository.toggleSave(game);
     notifyListeners();
   }
 
   bool isSaved(String gameId) {
-    return _savedIds.contains(gameId);
+    return _gameRepository.isSaved(gameId);
   }
 
-  // 起動時や「次」の時にセンサー検知を走らせる
+  // --- Core Game Logic ---
+
   Future<void> startDetection() async {
     _state = PreplayState.detecting;
     notifyListeners();
 
-    // 0.8秒（0.5秒より少しゆったり）かけてセンサーを模倣... ではなく本当に取得！
-    // 演出のための最低0.8秒 + 実際の処理時間
     final minWait = Future.delayed(const Duration(milliseconds: 800));
     final contextFuture = _situationService.determineContext();
     
-    // 両方終わるのを待つ
     final results = await Future.wait([minWait, contextFuture]);
     final detectedTags = results[1] as List<String>;
     
     _matchGameByContext(detectedTags);
   }
 
-  // AI Generation
   Future<void> generateWithAI() async {
     _state = PreplayState.thinking;
     notifyListeners();
 
-    // Get real context again or use cached? Let's get fresh.
     final contextTags = await _situationService.determineContext();
-    final generatedGame = await _aiService.generateGame(contextTags);
+    final generatedGame = await _gameRepository.generateAiGame(contextTags); // Via repo
 
     if (generatedGame != null) {
       _currentGame = generatedGame;
       _state = PreplayState.suggested;
     } else {
-      // Fallback if AI fails: just pick random
       next();
     }
     notifyListeners();
   }
 
   void _matchGameByContext(List<String> tags) {
-    // タグにマッチするゲームをフィルタリング
-    // tagsリストのいずれか1つでも持っていれば候補とする（OR条件）
-    // ただし 'all' は常に許可
     final availableGames = GameModel.mvpGames.where((game) {
       if (game.tags.contains('all')) return true;
       return tags.any((t) => game.tags.contains(t));
     }).toList();
 
-    // availableGamesが空の場合は全件から選ぶ安全策
     final pool = availableGames.isNotEmpty ? availableGames : GameModel.mvpGames;
-
     _currentGame = pool[Random().nextInt(pool.length)];
     _state = PreplayState.suggested;
     notifyListeners();
   }
 
   void next() {
-    // 「次」も再度検知から始めることで、場所が変わった感を出せる
     startDetection();
   }
   
+  List<String> _customTopics = [];
+
+  Future<void> selectGame(GameModel game) async {
+    _currentGame = game;
+    _state = PreplayState.suggested;
+    _currentTopic = null;
+    
+    _customTopics = await _gameRepository.loadCustomTopics(game.id); // Via repo
+    notifyListeners();
+  }
+
+  Future<void> addTopic(String topic) async {
+    if (_currentGame == null) return;
+    await _gameRepository.addCustomTopic(_currentGame!.id, topic); // Via repo
+    _customTopics.add(topic);
+    _currentTopic = topic;
+    notifyListeners();
+  }
+
+  void playGame() {
+    if (_currentGame == null) return;
+    _pickRandomTopic();
+    _state = PreplayState.playing;
+    notifyListeners();
+  }
+
+  void rerollTopic() {
+    if (_currentGame == null) return;
+    _pickRandomTopic();
+    notifyListeners();
+  }
+  
+  void _pickRandomTopic() {
+    if (_currentGame == null) return;
+    final allTopics = [...(_currentGame!.topics), ..._customTopics];
+    
+    if (allTopics.isEmpty) {
+      _currentTopic = null;
+      return;
+    }
+    
+    String newTopic;
+    int retry = 0;
+    do {
+      newTopic = allTopics[Random().nextInt(allTopics.length)];
+      retry++;
+    } while (newTopic == _currentTopic && allTopics.length > 1 && retry < 3);
+    
+    _currentTopic = newTopic;
+  }
+
+  void stopGame() {
+    _state = PreplayState.suggested;
+    _currentTopic = null;
+    notifyListeners();
+  }
+
   void dismiss() {
-    // 閉じる時も再度検知待機状態に戻す（アプリが眠るイメージ）
     startDetection();
   }
 }

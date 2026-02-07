@@ -1,38 +1,62 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/game_model.dart';
 
 class SavedGamesService {
-  static const String _key = 'preplay_saved_games';
+  static const String _key = 'preplay_saved_games_v2';
   
-  // Singleton pattern for easy access if needed (though Provider is better)
-  // For now, simple static methods or a simple class is fine.
-  // Using a class to allow future dependency injection / testing.
-
-  Future<List<String>> loadSavedIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_key) ?? [];
-  }
-
-  Future<void> saveId(String id) async {
+  Future<List<GameModel>> loadSavedGames() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_key) ?? [];
-    if (!list.contains(id)) {
-      list.add(id);
+    return list.map((item) => GameModel.fromJson(jsonDecode(item))).toList();
+  }
+
+  Future<void> saveGame(GameModel game) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_key) ?? [];
+    
+    bool exists = list.any((item) {
+      final decoded = jsonDecode(item);
+      return decoded['id'] == game.id;
+    });
+
+    if (!exists) {
+      list.add(jsonEncode(game.toJson()));
       await prefs.setStringList(_key, list);
     }
   }
 
-  Future<void> removeId(String id) async {
+  Future<void> removeGame(String gameId) async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_key) ?? [];
-    if (list.contains(id)) {
-      list.remove(id);
-      await prefs.setStringList(_key, list);
-    }
+    
+    list.removeWhere((item) {
+      final decoded = jsonDecode(item);
+      return decoded['id'] == gameId;
+    });
+    
+    await prefs.setStringList(_key, list);
   }
 
-  Future<bool> isSaved(String id) async {
+  Future<bool> isSaved(String gameId) async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_key) ?? [];
-    return list.contains(id);
+    return list.any((item) => jsonDecode(item)['id'] == gameId);
+  }
+  
+  // Custom Topics Logic
+  Future<List<String>> loadCustomTopics(String gameId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('custom_topics_$gameId') ?? [];
+  }
+
+  Future<void> addCustomTopic(String gameId, String topic) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'custom_topics_$gameId';
+    final list = prefs.getStringList(key) ?? [];
+    if (!list.contains(topic)) {
+      list.add(topic);
+      await prefs.setStringList(key, list);
+    }
   }
 }
