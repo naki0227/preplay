@@ -49,6 +49,8 @@
 	<!-- Permissions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>移動速度を検知して、状況に合った遊びを提案するために使用します。（例：車移動中など）</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>移動速度を検知して、状況に合った遊びを提案するために使用します。バックグラウンドでの位置情報取得は行いません。</string>
 	<key>NSMotionUsageDescription</key>
 	<string>歩行状態を検知して、立ち止まっているか歩いているかを判断するために使用します。</string>
 	<key>NSMicrophoneUsageDescription</key>
