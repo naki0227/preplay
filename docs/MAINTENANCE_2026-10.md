@@ -25,7 +25,7 @@
 | 1 | 「AIで生成」が必ず失敗し、普通の提案に戻る | Upstash Redis（レート制限用）が非アクティブでアーカイブされた。レート制限の呼び出しが例外を投げ、Gemini を呼ぶ前に 500 になる | Redis に繋がらないときは、インスタンス内メモリのレート制限に切り替えて処理を続ける（`backend/api/index.ts`） | **直した**（要再デプロイ → A） |
 | 2 | Redis を戻さないとレート制限が弱い | #1 と同じ | Upstash DB の復元または作り直し | **オーナーの作業待ち → B** |
 | 3 | Redis が直っても AI 生成が失敗する | モデル `gemini-1.5-flash` は提供終了 | Gemini REST API を直接呼ぶ形にし、モデルを `gemini-3.1-flash-lite` に変更。`GEMINI_MODEL` 環境変数で変えられるようにした。非推奨の `@google/generative-ai` SDK を外した | **直した**（要再デプロイ → A） |
-| 4 | Gemini キーが失効している可能性が高い | 流出したキーは無効化済み。Vercel の `GEMINI_API_KEY` は 2026-02-06 から更新されていない | 新しいキーを発行し、Vercel だけに設定する | **オーナーの作業待ち → C** |
+| 4 | Redis を迂回しても AI 生成が 500 | 再デプロイ後の確認で、Gemini API が **402 RESOURCE_EXHAUSTED「prepayment credits are depleted」** を返した。キーは認証を通り、モデル名も通っている。止まっている原因はキーの失効ではなく、前払いクレジットの残高切れ | AI Studio でクレジットを補充する。キーは 2026-02-06 から変わっていないので、作り直しも勧める | **オーナーの作業待ち → C** |
 | 5 | キーの流出経路 | 2026-02-06 以前、アプリは `.env` をアセットとして同梱し、そこから `GEMINI_API_KEY` を読んでいた。同梱した `.env` は IPA から誰でも取り出せる。公開版 1.0 も `.env` を同梱している | `.env` の同梱と `flutter_dotenv` をやめた。アプリには `--dart-define-from-file` で公開してよい値（バックエンド URL、Supabase URL/anon key）だけを渡す。Gemini キーはバックエンドだけに置く | **直した** |
 | 6 | `/api/health` がキーの先頭 10 文字を公開している | `keyPreview` を返していた | 削除。`hasApiKey` と `model` だけを返す | **直した**（要再デプロイ → A） |
 | 7 | アプリが `API_SECRET` を送っている | バックエンドは検証しておらず、アプリに入れた値は秘密にならない | アプリから削除。README と `.env.example` からも削除 | **直した** |
@@ -43,7 +43,14 @@
 
 ## オーナーの作業手順
 
-### A. バックエンドの再デプロイ（この PR をマージした後）
+### A. バックエンドの再デプロイ
+
+**2026-10-20 実施済み**: この PR のブランチ（`67c888e`）の `backend/` を、本番（`preplay-five.vercel.app`、デプロイ `dpl_73psZ38RdxpuJM8zYJ38XpxTssPL`）に出した。確認した結果:
+- `/api/health` → 200 `{"status":"ok","hasApiKey":true,"model":"gemini-3.1-flash-lite"}`（`keyPreview` は出なくなった）
+- `/api/generate` → Redis の障害は迂回して Gemini まで届いた。Gemini が 402（クレジット切れ）を返すため、まだ 500（→ C）
+- `/api/games` → 500（Redis がアーカイブされたまま → B。アプリからは使われていない）
+
+PR をマージした後に出し直す場合の手順:
 
 ```bash
 cd backend
@@ -71,7 +78,10 @@ curl -X POST https://preplay-five.vercel.app/api/generate \
 3. `KV_REST_API_URL` / `KV_REST_API_TOKEN` が `preplay` に入っていることを確認し、再デプロイする
 4. 無料プランの DB は、使われないと再びアーカイブされます。今回の修正で、アーカイブされても AI 生成は止まりません（インスタンスごとの簡易制限で動きます）
 
-### C. Gemini API キーを作り直す（重要）
+### C. Gemini のクレジット補充とキーの作り直し（重要）
+
+0. **まずクレジットを補充する**: https://ai.studio/projects で、Preplay のキーが属しているプロジェクトの Billing を開き、前払いクレジットを追加する（または支払い方法を見直す）。補充すれば、今のキーのままでも AI 生成が動きます。予算アラートを設定しておくと安心です
+   - クレジットが想定より早く減っていたら、キーが不正に使われた可能性があります。同じ画面の使用量を確認し、下の手順でキーを作り直してください
 
 1. Google AI Studio（https://aistudio.google.com/apikey）で、古い Preplay 用キーがあれば **削除** する。そのうえで新しいキーを発行する。キーの制限は「Generative Language API のみ」にする
 2. Vercel → `preplay` → Settings → Environment Variables で `GEMINI_API_KEY` を新しい値に置き換える（Production / Preview）。値はチャットやリポジトリに貼らない
