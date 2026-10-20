@@ -19,7 +19,8 @@ It handles Gemini API calls, keeping the API Key server-side.
     Go to your Vercel project dashboard -> Settings -> Environment Variables.
     Add:
     *   `GEMINI_API_KEY`: Your Google AI Studio API Key.
-    *   `API_SECRET`: A random string for basic auth (e.g., `openssl rand -hex 32`).
+    *   `GEMINI_MODEL` (optional): Gemini model ID. Default is `gemini-3.1-flash-lite`.
+    *   `KV_REST_API_URL` / `KV_REST_API_TOKEN`: set by the Upstash for Redis integration (rate limiting).
 
 4.  **Deploy**
     ```bash
@@ -41,7 +42,6 @@ It handles Gemini API calls, keeping the API Key server-side.
 
 **Headers:**
 ```
-Authorization: Bearer <your_API_SECRET>
 Content-Type: application/json
 ```
 
@@ -52,6 +52,8 @@ Content-Type: application/json
 }
 ```
 
+`GET /api/health` returns `{ status, hasApiKey, model }` (no part of the key).
+
 ## Local Development
 
 1.  Create a `.env` file (copy from `.env.example`).
@@ -59,3 +61,10 @@ Content-Type: application/json
     ```bash
     npm run dev
     ```
+
+## Checks
+
+```bash
+npm run typecheck
+npm test
+```

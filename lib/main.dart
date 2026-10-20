@@ -2,33 +2,31 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'; // Required for Colors
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/services.dart';
 import 'state/app_state.dart';
 import 'ui/home_screen.dart';
 import 'theme/app_colors.dart';
-import 'services/ai_service.dart';
+import 'config/app_config.dart';
 import 'services/community_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await dotenv.load(fileName: ".env");
-    
-    // Initialize Supabase
-    await Supabase.initialize(
-      url: dotenv.env['SUPABASE_URL'] ?? '',
-      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-    );
-    
-    // Seed initial data (Fire and Forget)
-    // In production, this should be done via admin script, but for MVP/Rescue:
-    CommunityService().seedDefaults();
+  if (AppConfig.hasSupabase) {
+    try {
+      await Supabase.initialize(
+        url: AppConfig.supabaseUrl,
+        anonKey: AppConfig.supabaseAnonKey,
+      );
 
-    AiService().init();
-  } catch (e) {
-    print("Env/Supabase load failed: $e");
-    // Proceed without Cloud features
+      // Seed initial data (Fire and Forget)
+      // In production, this should be done via admin script, but for MVP/Rescue:
+      CommunityService().seedDefaults();
+    } catch (e) {
+      print("Supabase init failed: $e");
+      // Proceed without Cloud features
+    }
+  } else {
+    print('SUPABASE_URL / SUPABASE_ANON_KEY not set. Community features disabled.');
   }
   
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(

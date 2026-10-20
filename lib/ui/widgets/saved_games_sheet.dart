@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../config/app_config.dart';
 import '../../models/game_model.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_colors.dart';
@@ -114,7 +115,7 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
                   onPressed: () {
                     // Start OS Sharing
                     Share.share(
-                      'この遊び知ってる？「${game.title}」\n\nルール: ${game.rules}\n\n#Preplay #暇つぶし\n\n📱 ダウンロードはこちら:\nhttps://example.com/preplay (仮)',
+                      'この遊び知ってる？「${game.title}」\n\nルール: ${game.rules}\n\n#Preplay #暇つぶし\n\n📱 ダウンロードはこちら:\n${AppConfig.appStoreUrl}',
                       subject: game.title,
                     );
                   },

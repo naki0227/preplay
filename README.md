@@ -39,6 +39,25 @@ lib/
     └── widgets/         # DetectiveView, SuggestionView, etc.
 ```
 
+## 🔧 Build
+
+APIキーはアプリに入れません。Gemini のキーはバックエンド（`backend/`、Vercel）の環境変数だけに置きます。
+アプリに渡すのは公開してよい値だけで、`--dart-define-from-file` で渡します。
+
+```bash
+cp config/app_config.example.json config/app_config.json   # 値を入れる（gitには入らない）
+flutter pub get
+flutter test
+flutter build ipa --dart-define-from-file=config/app_config.json
+```
+
+| キー | 内容 |
+|---|---|
+| `BACKEND_URL` | バックエンドのURL（省略時 `https://preplay-five.vercel.app`） |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | 「みんなの遊び」用。anon key は公開前提の値（RLSで保護） |
+
+障害の調査結果と復旧手順: [docs/MAINTENANCE_2026-10.md](docs/MAINTENANCE_2026-10.md)
+
 ## 🚀 Future Roadmap (V2.0)
 
 *   **Sensor Fusion**: GPS/加速度/マイクによるリアルタイム状況判定。

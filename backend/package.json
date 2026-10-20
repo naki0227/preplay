@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@upstash/ratelimit": "^2.0.1",
     "@upstash/redis": "^1.28.0",
     "hono": "^4.11.7"

@@ -6,11 +6,21 @@ class CommunityService {
   factory CommunityService() => _instance;
   CommunityService._internal();
 
-  final _client = Supabase.instance.client;
+  // Supabase is only initialized when SUPABASE_URL / SUPABASE_ANON_KEY are
+  // provided at build time. Accessing Supabase.instance before that throws.
+  SupabaseClient? get _client {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<List<GameModel>?> fetchCommunityGames() async {
+    final client = _client;
+    if (client == null) return null;
     try {
-      final response = await _client
+      final response = await client
           .from('games')
           .select()
           .order('created_at', ascending: false)
@@ -25,8 +35,10 @@ class CommunityService {
   }
 
   Future<bool> submitGame(GameModel game) async {
+    final client = _client;
+    if (client == null) return false;
     try {
-      await _client.from('games').insert({
+      await client.from('games').insert({
         'id': game.id,
         'title': game.title,
         'rules': game.rules,
@@ -42,10 +54,12 @@ class CommunityService {
   }
 
   Future<void> seedDefaults() async {
+    final client = _client;
+    if (client == null) return;
     for (final game in GameModel.mvpGames) {
       // Use upsert or ignore duplicate error
       try {
-        await _client.from('games').upsert({
+        await client.from('games').upsert({
           'id': game.id,
           'title': game.title,
           'rules': game.rules,
