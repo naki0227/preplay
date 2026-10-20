@@ -69,7 +69,7 @@ class AboutSheet extends StatelessWidget {
                   
                   const SizedBox(height: 48),
                   Center(
-                    child: Text('Version 1.5.0', style: AppText.caption),
+                    child: Text('Version 2.0.1', style: AppText.caption),
                   ),
                   const SizedBox(height: 48),
                 ],

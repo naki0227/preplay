@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import { cors } from 'hono/cors';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
 
@@ -24,6 +23,61 @@ const postRatelimit = new Ratelimit({
   analytics: true,
 });
 
+// Fallback used when Redis is unreachable (e.g. the Upstash DB was archived
+// for inactivity). Per-instance only, but keeps AI generation working and
+// still bounded instead of failing every request with 500.
+const memoryHits = new Map<string, number[]>();
+function memoryLimit(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const hits = (memoryHits.get(key) || []).filter((t) => now - t < windowMs);
+  if (hits.length >= max) {
+    memoryHits.set(key, hits);
+    return false;
+  }
+  hits.push(now);
+  memoryHits.set(key, hits);
+  return true;
+}
+
+async function allow(limiter: Ratelimit, key: string, max: number): Promise<boolean> {
+  try {
+    const { success } = await limiter.limit(key);
+    return success;
+  } catch (e) {
+    console.error('Rate limiter unavailable, using in-memory fallback:', e);
+    return memoryLimit(key, max, 60_000);
+  }
+}
+
+function clientIp(header: string | undefined): string {
+  return header?.split(',')[0]?.trim() || '127.0.0.1';
+}
+
+// gemini-1.5-flash was retired, which broke generation. Keep the model
+// configurable so the next retirement only needs an env change.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+
+async function generateText(prompt: string, apiKey: string): Promise<string> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }),
+    }
+  );
+  if (!res.ok) {
+    // Log status and body only; never the key.
+    throw new Error(`Gemini API error ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  }
+  const data: any = await res.json();
+  const text = (data?.candidates?.[0]?.content?.parts || [])
+    .map((p: any) => p?.text || '')
+    .join('');
+  if (!text) throw new Error('Gemini API returned no text');
+  return text;
+}
+
 // Use Vercel Edge Runtime
 export const config = {
   runtime: 'edge'
@@ -36,11 +90,11 @@ app.use('*', cors());
 
 // Health check endpoint
 app.get('/health', (c) => {
-  const hasApiKey = !!process.env.GEMINI_API_KEY;
+  // Do not expose any part of the key.
   return c.json({
     status: 'ok',
-    hasApiKey,
-    keyPreview: hasApiKey ? process.env.GEMINI_API_KEY?.substring(0, 10) + '...' : 'NOT SET'
+    hasApiKey: !!process.env.GEMINI_API_KEY,
+    model: GEMINI_MODEL,
   });
 });
 
@@ -49,9 +103,6 @@ app.use('/*', cors());
 // Helper: Check moderation using Gemini
 async function checkModeration(text: string, apiKey: string): Promise<boolean> {
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
     const prompt = `
     Analyze the following text for offensive, inappropriate, or harmful content (violence, hate speech, sexual content).
     Text: "${text}"
@@ -59,8 +110,7 @@ async function checkModeration(text: string, apiKey: string): Promise<boolean> {
     Reply with only "SAFE" or "UNSAFE".
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response.text().trim();
+    const response = (await generateText(prompt, apiKey)).trim();
     return response.toUpperCase().includes('SAFE') && !response.toUpperCase().includes('UNSAFE');
   } catch (e) {
     console.error('Moderation check failed:', e);
@@ -73,9 +123,8 @@ async function checkModeration(text: string, apiKey: string): Promise<boolean> {
 // --- POST /api/generate ---
 app.post('/generate', async (c) => {
   // Rate Limit Check
-  const ip = c.req.header('x-forwarded-for') || '127.0.0.1';
-  const { success } = await ratelimit.limit(ip);
-  if (!success) {
+  const ip = clientIp(c.req.header('x-forwarded-for'));
+  if (!(await allow(ratelimit, ip, 10))) {
     return c.json({ error: 'Rate limit exceeded. Please try again later.' }, 429);
   }
 
@@ -88,21 +137,18 @@ app.post('/generate', async (c) => {
       return c.json({ error: 'Server configuration error' }, 500);
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
     const prompt = `
     Create a detailed Japanese party game idea based on these contexts: ${tags?.join(', ')}.
     Group size: ${groupSize || 'any'}.
     
-    Format the response exactly like this:
+    Format the response exactly like this, in plain text without Markdown:
     ゲーム名: [Name]
     遊び方: [Rules in 2-3 sentences]
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const gameText = response.text();
+    // The app parses "ゲーム名:" / "遊び方:" lines, so strip Markdown that
+    // newer models tend to add (e.g. "**ゲーム名:**").
+    const gameText = (await generateText(prompt, apiKey)).replace(/[*#`]/g, '').trim();
 
     return c.json({ game: gameText });
   } catch (e) {
@@ -135,9 +181,8 @@ app.get('/games', async (c) => {
 // --- POST /api/games ---
 app.post('/games', async (c) => {
   // Rate Limit Check (Stricter)
-  const ip = c.req.header('x-forwarded-for') || '127.0.0.1';
-  const { success } = await postRatelimit.limit(`post_${ip}`);
-  if (!success) {
+  const ip = clientIp(c.req.header('x-forwarded-for'));
+  if (!(await allow(postRatelimit, `post_${ip}`, 3))) {
     return c.json({ error: 'Posting too fast. Please wait.' }, 429);
   }
 

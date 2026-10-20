@@ -1,6 +1,6 @@
 # プライバシーポリシー / Privacy Policy
 
-**最終更新日 / Last Updated: 2026-02-07**
+**最終更新日 / Last Updated: 2026-10-20**
 
 ---
 
@@ -31,6 +31,11 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 - **収集方法**: ユーザーが自発的に投稿
 - **保存**: Supabase（クラウドデータベース）に保存
 
+#### 2.5 AIによる遊びの生成
+- **目的**: 「AIで生成」を使ったときに、状況に合った遊びを作るため
+- **送信する情報**: 状況タグ（例:「静か」「歩いている」）と人数のみ。位置情報・音声そのものは送信しません
+- **送信先**: 本アプリのサーバーを経由して Google Gemini API に送信されます
+
 ### 3. 情報の第三者提供
 本アプリは、法令に基づく場合を除き、ユーザーの個人情報を第三者に提供しません。
 
@@ -39,7 +44,7 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 
 ### 5. お問い合わせ
 プライバシーに関するご質問は、以下までご連絡ください：
-- GitHub: https://github.com/naki0227/preplay/issues
+- メール: contact@enludus.com
 
 ---
 
@@ -70,6 +75,11 @@ Preplay ("the App") respects user privacy and is committed to protecting persona
 - **Method**: Voluntarily submitted by users
 - **Storage**: Stored in Supabase (cloud database)
 
+#### 2.5 AI Game Generation
+- **Purpose**: To generate a game when you use the AI generation feature
+- **Data sent**: Context tags only (e.g. "quiet", "walking") and group size. Raw location and audio are never sent
+- **Recipient**: Sent via the App's server to the Google Gemini API
+
 ### 3. Third-Party Sharing
 We do not share personal information with third parties except as required by law.
 
@@ -78,7 +88,7 @@ Collected data is protected using industry-standard encryption.
 
 ### 5. Contact
 For privacy-related inquiries, please contact us at:
-- GitHub: https://github.com/naki0227/preplay/issues
+- Email: contact@enludus.com
 
 ---
 

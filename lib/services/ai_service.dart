@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/app_config.dart';
 import '../models/game_model.dart';
 
 class AiService {
@@ -8,20 +8,10 @@ class AiService {
   factory AiService() => _instance;
   AiService._internal();
 
-  String? _backendUrl;
-  String? _apiSecret;
-
-  void init() {
-    _backendUrl = dotenv.env['BACKEND_URL'];
-    _apiSecret = dotenv.env['API_SECRET'];
-    
-    if (_backendUrl == null || _backendUrl!.isEmpty) {
-      print('BACKEND_URL is not set in .env');
-    }
-  }
+  final String _backendUrl = AppConfig.backendUrl;
 
   Future<GameModel?> generateGame(List<String> contextTags) async {
-    if (_backendUrl == null || _backendUrl!.isEmpty) {
+    if (_backendUrl.isEmpty) {
       print('Backend URL not configured.');
       return null;
     }
@@ -29,16 +19,12 @@ class AiService {
     try {
       final response = await http.post(
         Uri.parse('$_backendUrl/api/generate'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (_apiSecret != null && _apiSecret!.isNotEmpty)
-            'Authorization': 'Bearer $_apiSecret',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'tags': contextTags,
           'groupSize': 2, // Default group size
         }),
-      );
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
         print('Backend error: ${response.statusCode} - ${response.body}');
