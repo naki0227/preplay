@@ -37,14 +37,16 @@ void main() {
     await _settle(tester);
     await binding.takeScreenshot('1_suggestion');
 
-    // 2. Playing with a topic
+    // 2. Playing with a topic and the timer running
     controller.playGame();
+    await _settle(tester);
+    await tester.tap(find.text('3分'));
     await _settle(tester);
     await binding.takeScreenshot('2_playing');
     controller.stopGame();
     await _settle(tester);
 
-    // 3. Favorites
+    // Favorites
     for (final id in ['word_wolf', 'black_stories', 'insider_game', 'ng_word', 'first_impression']) {
       await controller.toggleSave(_game(id));
     }
@@ -52,14 +54,19 @@ void main() {
     await _settle(tester);
     await tester.tap(find.byIcon(CupertinoIcons.square_favorites_alt));
     await _settle(tester);
-    await binding.takeScreenshot('3_favorites');
+    await binding.takeScreenshot('4_favorites');
+
+    // 3. All games with search (taken while the sheet is open; numbered for the store order)
+    await tester.tap(find.text('すべて'));
+    await _settle(tester);
+    await binding.takeScreenshot('3_all_games');
     Navigator.of(tester.element(find.text('お気に入り'))).pop();
     await _settle(tester);
 
-    // 4. "その場に合わせる" explanation (no permission prompt is shown yet)
+    // 5. "その場に合わせる" explanation (no permission prompt is shown yet)
     await tester.tap(find.text('その場に合わせる：オフ'));
     await _settle(tester);
-    await binding.takeScreenshot('4_context');
+    await binding.takeScreenshot('5_context');
     await tester.tap(find.text('今はしない'));
     await _settle(tester);
   });
