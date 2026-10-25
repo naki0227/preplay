@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { makeToken, sync, diff } from '../sync.mjs';
+import { makeToken, sync, diff, snapshot } from '../sync.mjs';
 
 test('token is a valid ES256 JWT for App Store Connect', () => {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
@@ -184,4 +184,19 @@ test('dry run of a new version diffs against the live version', async () => {
   assert.match(out, /comparing with live version 1\.0/);
   assert.match(out, /supportUrl: "https:\/\/enludus\.vercel\.app" -> "https:\/\/enludus\.com"/);
   assert.match(out, /whatsNew: null ->/);
+});
+
+test('snapshot reads current values in metadata.yaml shape without writing', async () => {
+  const { api, calls } = fakeApi({ versionExists: false });
+  const wrapped = async (m, p, b) => {
+    if (p === '/v1/appStoreVersionLocalizations/LIVELOC/appScreenshotSets') return { data: [{ id: 'S', attributes: { screenshotDisplayType: 'APP_IPHONE_67' } }] };
+    if (p === '/v1/appScreenshotSets/S/appScreenshots') return { data: [{ id: 'X', attributes: { fileName: '1.png' } }] };
+    return api(m, p, b);
+  };
+  const snap = await snapshot(wrapped, 'com.preplay.preplay');
+  assert.equal(snap.version.versionString, '1.0');
+  assert.equal(snap.localizations.ja.supportUrl, 'https://enludus.vercel.app');
+  assert.deepEqual(snap.localizations.ja.screenshots, { APP_IPHONE_67: ['1.png'] });
+  assert.equal(snap.appInfo.ja.name, 'Preplay');
+  assert.ok(calls.every((c) => c.method === 'GET'));
 });

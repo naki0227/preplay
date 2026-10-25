@@ -36,7 +36,7 @@ https://github.com/naki0227/preplay/settings/secrets/actions を開き、**「Re
 
 1. `pubspec.yaml` の `version` と、`appstore/metadata.yaml` の `version.versionString` を上げる（テストで一致を確認しています）
 2. リリースノート（`whatsNew`）など、ストアの文面を `appstore/metadata.yaml` で直す
-3. PR を作る → 「App Store metadata」のログで、何が変わるかを確認する
+3. PR を作る → 「App Store metadata」のログで、何が変わるかを確認する。ログの最後には App Store Connect の今の値が YAML の形で出るので、変えたい項目をコピーして `metadata.yaml` に貼り、書き換えればよい
 4. main にマージする → ストアの情報が反映される。そのバージョンがまだなければ「提出準備中」で作られる
 5. Actions → 「iOS release」→ Run workflow
    - まず「upload」のチェックなしで実行して、ビルドが通るか確かめる（IPA は Artifacts に 7 日残ります）

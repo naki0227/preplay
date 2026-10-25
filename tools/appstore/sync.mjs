@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve, basename } from 'node:path';
 import { createHash, createPrivateKey, sign } from 'node:crypto';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 
 const API = 'https://api.appstoreconnect.apple.com';
 
@@ -224,6 +224,56 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
   return pending;
 }
 
+// --- Snapshot ---
+// Current values in App Store Connect, in the same shape as metadata.yaml,
+// so they can be copied into the file and edited.
+const APP_INFO_FIELDS = ['name', 'subtitle', 'privacyPolicyUrl', 'privacyChoicesUrl'];
+const VERSION_LOC_FIELDS = ['description', 'keywords', 'promotionalText', 'supportUrl', 'marketingUrl', 'whatsNew'];
+
+function pick(attrs, fields) {
+  return Object.fromEntries(fields.filter((f) => attrs[f] != null && attrs[f] !== '').map((f) => [f, attrs[f]]));
+}
+
+export async function snapshot(api, bundleId) {
+  const app = (await api('GET', `/v1/apps?filter[bundleId]=${encodeURIComponent(bundleId)}`)).data[0];
+  if (!app) throw new Error(`App not found for bundle id ${bundleId}`);
+  const out = { bundleId };
+
+  const versions = (await api('GET', `/v1/apps/${app.id}/appStoreVersions?filter[platform]=IOS`)).data;
+  const stateOf = (v) => v.attributes.appStoreState ?? v.attributes.appVersionState;
+  const version = versions.find((v) => EDITABLE_VERSION_STATES.has(stateOf(v))) ||
+    versions.find((v) => ['READY_FOR_SALE', 'READY_FOR_DISTRIBUTION'].includes(stateOf(v))) || versions[0];
+  if (version) {
+    out.version = { versionString: version.attributes.versionString, state: stateOf(version), ...pick(version.attributes, ['copyright', 'releaseType']) };
+  }
+
+  const infos = (await api('GET', `/v1/apps/${app.id}/appInfos`)).data;
+  const info = infos.find((i) => !['READY_FOR_DISTRIBUTION', 'READY_FOR_SALE'].includes(i.attributes.state ?? i.attributes.appStoreState)) || infos[0];
+  if (info) {
+    out.appInfo = {};
+    for (const l of (await api('GET', `/v1/appInfos/${info.id}/appInfoLocalizations`)).data) {
+      out.appInfo[l.attributes.locale] = pick(l.attributes, APP_INFO_FIELDS);
+    }
+  }
+
+  if (version) {
+    out.localizations = {};
+    for (const l of (await api('GET', `/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`)).data) {
+      const entry = pick(l.attributes, VERSION_LOC_FIELDS);
+      const sets = (await api('GET', `/v1/appStoreVersionLocalizations/${l.id}/appScreenshotSets`)).data;
+      if (sets.length) {
+        entry.screenshots = {};
+        for (const set of sets) {
+          const shots = (await api('GET', `/v1/appScreenshotSets/${set.id}/appScreenshots`)).data;
+          entry.screenshots[set.attributes.screenshotDisplayType] = shots.map((x) => x.attributes.fileName);
+        }
+      }
+      out.localizations[l.attributes.locale] = entry;
+    }
+  }
+  return out;
+}
+
 // --- Screenshots ---
 // For each display type listed in the YAML, make the set match the listed
 // files exactly (same images, same order). Display types not listed are left
@@ -308,7 +358,7 @@ async function syncScreenshots(api, locId, locale, wantedSets, opts) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [file, flag] = process.argv.slice(2);
   if (!file) {
-    console.error('usage: node sync.mjs <metadata.yaml> [--apply]');
+    console.error('usage: node sync.mjs <metadata.yaml> [--apply | --show]');
     process.exit(2);
   }
   for (const name of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_KEY_P8']) {
@@ -323,7 +373,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     issuerId: process.env.ASC_ISSUER_ID,
     privateKey: process.env.ASC_KEY_P8,
   });
-  sync(createClient(token), meta, { apply: flag === '--apply', baseDir: dirname(resolve(file)) }).catch((e) => {
+  const run = flag === '--show'
+    ? snapshot(createClient(token), meta.bundleId).then((snap) => {
+        console.log('# Current values in App Store Connect (screenshots: file names only)');
+        console.log(stringify(snap, { lineWidth: 0 }));
+      })
+    : sync(createClient(token), meta, { apply: flag === '--apply', baseDir: dirname(resolve(file)) });
+  run.catch((e) => {
     console.error(e.message);
     process.exit(1);
   });

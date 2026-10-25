@@ -54,4 +54,6 @@ jobs:
             npm run apply
           else
             npm run dry-run
+            echo
+            npm run show
           fi

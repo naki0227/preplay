@@ -5,6 +5,7 @@
   "scripts": {
     "dry-run": "node sync.mjs ../../appstore/metadata.yaml",
     "apply": "node sync.mjs ../../appstore/metadata.yaml --apply",
+    "show": "node sync.mjs ../../appstore/metadata.yaml --show",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
