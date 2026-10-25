@@ -9,8 +9,14 @@ void main() {
     expect(AppConfig.backendUrl, isNot(contains('enludus.vercel.app')));
   });
 
-  test('Supabase is disabled when no config is passed at build time', () {
-    expect(AppConfig.hasSupabase, isFalse);
+  test('Supabase is enabled only when both values are passed at build time', () {
+    expect(
+      AppConfig.hasSupabase,
+      AppConfig.supabaseUrl.isNotEmpty && AppConfig.supabaseAnonKey.isNotEmpty,
+    );
+    if (AppConfig.hasSupabase) {
+      expect(AppConfig.supabaseUrl, startsWith('https://'));
+    }
   });
 
   test('share link is the App Store page, not a placeholder', () {
