@@ -94,29 +94,35 @@ curl -X POST https://preplay-five.vercel.app/api/generate \
 1. Supabase ダッシュボードで、Preplay 用プロジェクトがどのアカウント・組織にあるかを確認する。公開版の `.env` にあった `SUPABASE_URL` のプロジェクトです
    - **一時停止中**なら Restore する
    - **削除済み**なら新しいプロジェクトを作り、`supabase_schema.sql` を SQL Editor で実行する
-2. Project Settings → API で URL と anon (public) key を確認し、`config/app_config.json` に書く（このファイルは Git に入りません）
+2. Project Settings → API で URL と anon (public) key を確認し、`config/app_config.json` に書く（公開前提の値なので Git で管理する。2026-10-25 に新しいプロジェクトの値を記入済み）
 3. 無料プランは 7 日間使われないと一時停止します。公開を続けるなら、有料プランにするか定期的にアクセスするなどの対策を検討する
 4. Supabase を用意できないまま提出しても、アプリは落ちません。「みんなの遊び」だけが「読み込みに失敗しました」と表示されます
 
 ### E. App Store Connect の情報
 
-1. App 情報 → 販売元の Web サイト / サポート URL を `https://enludus.com` に変える
-2. `PRIVACY_POLICY.md` の内容を公開する。たとえば `https://enludus.com/preplay/privacy` として公開し、App 情報の「プライバシーポリシー URL」に設定する
-3. App のプライバシー（データの収集）の申告に、ユーザーが投稿するコンテンツと、AI 生成で状況タグを送ることが反映されているか確認する
+`appstore/metadata.yaml` で管理し、CD（`App Store metadata` ワークフロー）で反映する形にした。中身:
+
+- サポート URL・マーケティング URL → `https://enludus.com`（旧 `enludus.vercel.app` から変更）
+- プライバシーポリシー URL → `https://github.com/naki0227/preplay/blob/main/PRIVACY_POLICY.md`（この PR で内容も更新）
+- 2.0.1 のリリースノート、説明文（公開中と同じ文面）
+
+オーナーの作業: [docs/RELEASE.md](RELEASE.md) の「最初に一度だけやること」（API キーを作り、GitHub Secrets に登録する）。そのあと、この PR をマージすれば反映される。
+
+- App のプライバシー（データの収集）の申告は API で管理していないので、App Store Connect の画面で確認する。ユーザー投稿と、AI 生成で状況タグを送ることが入っているか
 
 ### F. ビルドと提出
 
+GitHub Actions の「iOS release」でビルドし、App Store Connect にアップロードできるようにした。手順は [docs/RELEASE.md](RELEASE.md)。
+
+- バージョンは **2.0.1**。ビルド番号は実行日時から自動で決まる
+- 審査への提出は App Store Connect の画面で行う
+
+手元の Mac でビルドする場合:
+
 ```bash
-cp config/app_config.example.json config/app_config.json   # D で確認した値を入れる
-flutter pub get
-flutter test
-cd ios && pod install && cd ..
+flutter pub get && flutter test
 flutter build ipa --dart-define-from-file=config/app_config.json
 ```
-
-- macOS と最新の Xcode でビルドする（App Store は最新の SDK でのビルドを求めます）
-- バージョンは **2.0.1 (10)**。公開版の 1.0 より大きくしてあります。以前に 2.0.0 のビルドをアップロードしていても重なりません。App Store Connect で新しいバージョン「2.0.1」を作ってから提出する
-- `build/ios/ipa/*.ipa` を Transporter か Xcode Organizer でアップロードし、App Store Connect で提出する
 
 ## リリースノート案（日本語）
 

@@ -1,0 +1,106 @@
+name: iOS release
+
+# Manual only. Builds the IPA and, when "upload" is checked, sends it to
+# App Store Connect (TestFlight). Submitting for review stays a manual step
+# in App Store Connect.
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload to App Store Connect'
+        type: boolean
+        default: false
+
+env:
+  TEAM_ID: X97ZJZ42VZ
+
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - run: flutter pub get
+      - run: flutter test --dart-define-from-file=config/app_config.json
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+
+      # Unique, increasing build number per run (version comes from pubspec.yaml).
+      - name: Build number
+        run: echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
+
+      # Generates ios/Flutter/Generated.xcconfig (dart-defines, build number)
+      # and installs pods; signing is done by xcodebuild below.
+      - name: Flutter build (no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define-from-file=config/app_config.json \
+            --build-number="$BUILD_NUMBER"
+
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Export${{ inputs.upload && ' and upload' || '' }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          DESTINATION: ${{ inputs.upload && 'upload' || 'export' }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>${DESTINATION}</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Keep IPA
+        if: ${{ !inputs.upload }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: preplay-ipa-${{ env.BUILD_NUMBER }}
+          path: ${{ runner.temp }}/export/*.ipa
+          retention-days: 7
+
+      - name: Remove API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"

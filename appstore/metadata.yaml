@@ -1,0 +1,43 @@
+# App Store Connect metadata managed in Git.
+# CD (.github/workflows/appstore-metadata.yml) applies this file:
+#   - pull request: dry run (shows what would change)
+#   - push to main: applies the changes
+# Only fields written here are touched. Delete a field to leave it as is.
+# Submission for review is NOT automated; do that in App Store Connect.
+
+bundleId: com.preplay.preplay
+
+# The App Store version to edit. Created in "Prepare for Submission" state
+# if it does not exist yet. Keep in sync with pubspec.yaml.
+version:
+  versionString: "2.0.1"
+
+# App information (applies to all versions)
+appInfo:
+  ja:
+    privacyPolicyUrl: https://github.com/naki0227/preplay/blob/main/PRIVACY_POLICY.md
+
+# Version information, per locale
+localizations:
+  ja:
+    supportUrl: https://enludus.com
+    marketingUrl: https://enludus.com
+    whatsNew: |-
+      いくつかの不具合を修正しました。
+
+      ・「AIで生成」が使えなくなっていた問題を修正しました
+      ・遊びを共有するときのリンクを、App Store のページに変更しました
+      ・アプリ内のバージョン表示を修正しました
+      ・安定性を改善しました
+    description: |-
+      「暇だ」を「楽しい」に変える、たった1つのボタン。
+
+      Preplayは、今いる場所・状況に合わせて「その場でできる遊び」をAIが提案してくれるアプリです。 電車の待ち時間、公園でのひまつぶし... ボタンを押すだけで、あなたの「今」にぴったりの遊びが見つかります。
+
+      主な機能
+
+      ・状況検知: 移動中？静か？騒がしい？を自動判断
+      ・40種類以上の遊び: しりとり、心理ゲーム、パーティーゲームなど
+      ・AI生成: 無限にオリジナルの遊びを提案
+      ・お気に入り保存: いつでも遊べるようにストック
+      ・みんなの遊び: ユーザー投稿の遊びを発見

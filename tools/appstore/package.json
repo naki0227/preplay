@@ -1,0 +1,13 @@
+{
+  "name": "preplay-appstore-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dry-run": "node sync.mjs ../../appstore/metadata.yaml",
+    "apply": "node sync.mjs ../../appstore/metadata.yaml --apply",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  }
+}
