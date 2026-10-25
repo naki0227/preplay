@@ -5,6 +5,7 @@ import '../../config/app_config.dart';
 import '../../models/game_model.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_colors.dart';
+import 'all_games_list.dart';
 
 class SavedGamesSheet extends StatefulWidget {
   const SavedGamesSheet({super.key});
@@ -51,14 +52,15 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
               child: CupertinoSlidingSegmentedControl<int>(
                 groupValue: _groupValue,
                 children: const {
-                  0: Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('お気に入り')),
-                  1: Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('みんなの遊び')),
+                  0: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('お気に入り')),
+                  1: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('すべて')),
+                  2: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('みんなの遊び')),
                 },
                 onValueChanged: (value) {
                   setState(() {
                     _groupValue = value ?? 0;
                   });
-                  if (_groupValue == 1 && communityGames.isEmpty && !isLoading && communityError == null) {
+                  if (_groupValue == 2 && communityGames.isEmpty && !isLoading && communityError == null) {
                     controller.loadCommunityGames();
                   }
                 },
@@ -67,9 +69,11 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
           ),
 
           Expanded(
-            child: _groupValue == 0
-                ? _buildSavedList(context, controller, savedGames)
-                : _buildCommunityList(context, controller, communityGames, isLoading, communityError),
+            child: switch (_groupValue) {
+              0 => _buildSavedList(context, controller, savedGames),
+              1 => const AllGamesList(),
+              _ => _buildCommunityList(context, controller, communityGames, isLoading, communityError),
+            },
           ),
         ],
       ),
@@ -111,7 +115,7 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
                 // OS Share Button (Viral)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.share, size: 24),
+                  child: const Icon(CupertinoIcons.share, size: 24, semanticLabel: '友達に送る'),
                   onPressed: () {
                     // Start OS Sharing
                     Share.share(
@@ -125,14 +129,14 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
                 // Community Upload Button (Cloud)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.cloud_upload, size: 24),
+                  child: const Icon(CupertinoIcons.cloud_upload, size: 24, semanticLabel: 'みんなの遊びに公開'),
                   onPressed: () => _confirmShare(context, controller, game),
                 ),
                 const SizedBox(width: 8),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: () => controller.toggleSave(game),
-                  child: const Icon(CupertinoIcons.heart_fill, color: CupertinoColors.systemPink),
+                  child: const Icon(CupertinoIcons.heart_fill, color: CupertinoColors.systemPink, semanticLabel: 'お気に入りから外す'),
                 ),
               ],
             ),
@@ -217,12 +221,13 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
                   child: Icon(
                     isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
                     color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
+                    semanticLabel: isSaved ? 'お気に入りから外す' : 'お気に入りに追加',
                   ),
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: () => _showCommunityActions(context, controller, game),
-                  child: const Icon(CupertinoIcons.ellipsis, color: CupertinoColors.systemGrey),
+                  child: const Icon(CupertinoIcons.ellipsis, color: CupertinoColors.systemGrey, semanticLabel: 'その他の操作'),
                 ),
               ],
             ),

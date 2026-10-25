@@ -1,5 +1,5 @@
--- Fresh setup for the Preplay Supabase project. Run in the SQL Editor, then
--- run supabase/migration_2026-10-25.sql and supabase/seed.sql.
+-- Initial schema. Applied by tool/migrate.sh (CI); safe on a project that
+-- already has the games table.
 
 -- Create the games table
 create table if not exists public.games (
@@ -20,5 +20,5 @@ drop policy if exists "Enable insert for all users" on public.games;
 create policy "Enable insert for all users" on public.games
   for insert with check (true);
 
--- Reading is set up in supabase/migration_2026-10-25.sql
+-- Reading is set up in 20261025000100_reports_and_limits.sql
 -- (reported games are hidden).

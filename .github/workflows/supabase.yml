@@ -1,0 +1,57 @@
+name: Supabase
+
+# supabase/migrations + supabase/seed.sql
+#   pull request: test on a throwaway Postgres, then dry run against the real DB
+#   push to main: test, then apply to the real DB
+# Needs the repository secret SUPABASE_DB_URL (Session pooler connection string).
+on:
+  pull_request:
+    paths: ['supabase/**', 'tool/migrate.sh', '.github/workflows/supabase.yml']
+  push:
+    branches: [main]
+    paths: ['supabase/**', 'tool/migrate.sh', '.github/workflows/supabase.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v5
+      - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_stand_in.sql
+      - run: tool/migrate.sh
+      - name: Run again (must be a no-op)
+        run: tool/migrate.sh
+      - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -q -f supabase/tests/policies.sql
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check secret
+        id: secret
+        run: |
+          if [ -n "$DATABASE_URL" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::SUPABASE_DB_URL is not set. Skipping the real database."; fi
+      - name: Dry run
+        if: steps.secret.outputs.ok == 'true' && github.event_name == 'pull_request'
+        run: tool/migrate.sh --dry-run
+      - name: Apply
+        if: steps.secret.outputs.ok == 'true' && github.event_name != 'pull_request'
+        run: tool/migrate.sh

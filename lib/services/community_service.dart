@@ -54,7 +54,7 @@ class CommunityService {
   }
 
   /// Records a report. Games with enough reports are hidden for everyone by
-  /// the select policy in supabase_schema.sql. Returns false on failure.
+  /// the select policy in supabase/migrations. Returns false on failure.
   Future<bool> reportGame(String gameId) async {
     final client = _client;
     if (client == null) return false;

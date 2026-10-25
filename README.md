@@ -56,7 +56,7 @@ flutter build ipa --dart-define-from-file=config/app_config.json
 | `BACKEND_URL` | バックエンドのURL（省略時 `https://preplay-five.vercel.app`） |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | 「みんなの遊び」用。anon / publishable key は公開前提の値（RLSで保護） |
 
-リリース（CI でのビルドと App Store Connect へのアップロード、ストア情報の自動更新）: [docs/RELEASE.md](docs/RELEASE.md)
+リリース（CI でのビルドと App Store Connect へのアップロード、ストア情報・スクリーンショット・Supabase の自動更新）: [docs/RELEASE.md](docs/RELEASE.md)
 
 障害の調査結果と復旧手順: [docs/MAINTENANCE_2026-10.md](docs/MAINTENANCE_2026-10.md)
 

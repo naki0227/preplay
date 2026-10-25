@@ -164,6 +164,7 @@ class GameSuggestionView extends StatelessWidget {
                   CupertinoIcons.square_favorites_alt,
                   color: CupertinoColors.label,
                   size: 24,
+                  semanticLabel: 'お気に入りと遊びの一覧',
                 ),
               ),
             ),
@@ -243,6 +244,7 @@ class _SaveButton extends StatelessWidget {
           isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
           color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
           size: 24,
+          semanticLabel: isSaved ? 'お気に入りから外す' : 'お気に入りに追加',
         ),
       ),
     );

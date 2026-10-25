@@ -57,7 +57,7 @@ class HomeScreen extends StatelessWidget {
                   color: CupertinoColors.white.withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(CupertinoIcons.info, color: AppColors.textMain, size: 24),
+                child: const Icon(CupertinoIcons.info, color: AppColors.textMain, size: 24, semanticLabel: 'Preplayについて'),
               ),
             ),
           ),

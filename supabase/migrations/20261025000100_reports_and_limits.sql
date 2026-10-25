@@ -1,5 +1,5 @@
--- Run once in the Supabase SQL Editor (Preplay project), after supabase_schema.sql
--- from 2026-10-25 was applied. Safe to run more than once.
+-- Report table, posting limits and hiding reported games.
+-- Applied by tool/migrate.sh (CI). Safe to run more than once.
 
 -- 1. Limits on what can be posted to "みんなの遊び" (the anon key can insert directly).
 alter table public.games drop constraint if exists games_title_len;
