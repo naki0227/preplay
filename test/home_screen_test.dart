@@ -27,5 +27,12 @@ void main() {
     expect(find.text('やる'), findsOneWidget);
     expect(find.text('閉じる'), findsNothing);
     expect(find.text('その場に合わせる：オフ'), findsOneWidget);
+    expect(find.bySemanticsLabel('Preplayについて'), findsOneWidget);
+
+    // While playing, the header has its own controls; the info button is hidden.
+    controller.playGame();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.bySemanticsLabel('Preplayについて'), findsNothing);
+    expect(find.text('終わり'), findsOneWidget);
   });
 }

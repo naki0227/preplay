@@ -34,6 +34,7 @@ class GameSuggestionView extends StatelessWidget {
                         clipBehavior: Clip.none,
                         children: [
                           Container(
+                            width: double.infinity, // same width as the buttons (iPad)
                             padding: const EdgeInsets.all(32.0),
                             decoration: BoxDecoration(
                               color: CupertinoColors.systemBackground.resolveFrom(context),
