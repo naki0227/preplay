@@ -23,7 +23,7 @@
 | # | 症状 | 原因 | 直し方 | 状態 |
 |---|---|---|---|---|
 | 1 | 「AIで生成」が必ず失敗し、普通の提案に戻る | Upstash Redis（レート制限用）が非アクティブでアーカイブされた。レート制限の呼び出しが例外を投げ、Gemini を呼ぶ前に 500 になる | Redis に繋がらないときは、インスタンス内メモリのレート制限に切り替えて処理を続ける（`backend/api/index.ts`） | **直した**（要再デプロイ → A） |
-| 2 | Redis を戻さないとレート制限が弱い | #1 と同じ | Upstash DB の復元または作り直し | **オーナーの作業待ち → B** |
+| 2 | Redis を戻さないとレート制限が弱い | #1 と同じ | Upstash DB の復元または作り直し | **直した**（2026-10-25: Redis をやめた。下の B） |
 | 3 | Redis が直っても AI 生成が失敗する | モデル `gemini-1.5-flash` は提供終了 | Gemini REST API を直接呼ぶ形にし、モデルを `gemini-3.1-flash-lite` に変更。`GEMINI_MODEL` 環境変数で変えられるようにした。非推奨の `@google/generative-ai` SDK を外した | **直した**（要再デプロイ → A） |
 | 4 | Redis を迂回しても AI 生成が 500 | 再デプロイ後の確認で、Gemini API が **402 RESOURCE_EXHAUSTED「prepayment credits are depleted」** を返した。キーは認証を通り、モデル名も通っている。止まっている原因はキーの失効ではなく、前払いクレジットの残高切れ | AI Studio でクレジットを補充する。キーは 2026-02-06 から変わっていないので、作り直しも勧める | **オーナーの作業待ち → C** |
 | 5 | キーの流出経路 | 2026-02-06 以前、アプリは `.env` をアセットとして同梱し、そこから `GEMINI_API_KEY` を読んでいた。同梱した `.env` は IPA から誰でも取り出せる。公開版 1.0 も `.env` を同梱している | `.env` の同梱と `flutter_dotenv` をやめた。アプリには `--dart-define-from-file` で公開してよい値（バックエンド URL、Supabase URL/anon key）だけを渡す。Gemini キーはバックエンドだけに置く | **直した** |
@@ -39,7 +39,7 @@
 | 15 | Preplay 専用のプライバシーポリシーページがない | `https://enludus.com/privacy` はサイト全体のポリシーで、各アプリのポリシーは「当該製品のポリシー」を見るよう書かれている。`/preplay` は 404 | `PRIVACY_POLICY.md` を更新した（連絡先をメールに変更、Gemini への送信を明記）。公開とURL設定は E | **オーナーの作業待ち → E** |
 | 16 | 開発環境のメモ | iOS の IPA は Linux ではビルドできない | macOS と最新の Xcode でビルドする | **オーナーの作業待ち → F** |
 
-`/api/games`（Redis に保存するコミュニティ API）は、アプリからは使われていません（アプリは Supabase を使っています）。Redis が戻るまで 500 を返しますが、今回は触っていません。
+`/api/games`（Redis に保存するコミュニティ API）は、アプリからは使われていなかったので、2026-10-25 に Redis と一緒に削除しました（アプリは Supabase を使っています）。
 
 ## オーナーの作業手順
 
@@ -71,15 +71,18 @@ curl -X POST https://preplay-five.vercel.app/api/generate \
 
 公開中の 1.0 も同じ `/api/generate` を呼んでいます。そのため A と C が済めば、アプリを更新していない人の AI 生成も直ります。
 
-### B. Upstash Redis（レート制限）を戻す
+### B. Redis（レート制限）
 
-1. Vercel ダッシュボード → Storage → `preplay-kv` を開く（状態: Archived due to inactivity）
-2. Vercel の表示どおり、Upstash Redis の DB を新しく作る（Vercel ダッシュボードから）。そのあと Upstash コンソールの inactive databases で旧 DB を **Restore** する。または、新しい DB を `preplay` プロジェクトにつなぎ直す
-3. `KV_REST_API_URL` / `KV_REST_API_TOKEN` が `preplay` に入っていることを確認し、再デプロイする
-4. 無料プランの DB は、使われないと再びアーカイブされます。今回の修正で、アーカイブされても AI 生成は止まりません（インスタンスごとの簡易制限で動きます）
+**2026-10-25: Redis を使うのをやめた。** Vercel Marketplace 経由で作った Upstash は、普段の Upstash アカウントからは見えず、管理しにくいため。
+
+- レート制限は、各インスタンスのメモリ上で行う（IP ごとに 60 秒 10 回まで）
+- インスタンスをまたいだ制限ではないので、**費用の上限は AI Studio の「Monthly spend cap」で守る**（C を参照）
+- Redis を使っていた `/api/games` も削除した（アプリからは使われていなかった）
+- Vercel の Storage にある古い `preplay-kv` は、もう使わないので削除してよい: https://vercel.com/nakis-projects-d1ae2531/preplay/stores
 
 ### C. Gemini のクレジット補充とキーの作り直し（重要）
 
+0. **月の上限（Monthly spend cap）を設定する**: AI Studio の Spend ページ →「Monthly spend cap」→「Edit spend cap」で **$5** などにする。Redis をやめたので、これが費用の上限になる
 0. **まずクレジットを補充する**: https://ai.studio/projects で、Preplay のキーが属しているプロジェクトの Billing を開き、前払いクレジットを追加する（または支払い方法を見直す）。補充すれば、今のキーのままでも AI 生成が動きます。予算アラートを設定しておくと安心です
    - クレジットが想定より早く減っていたら、キーが不正に使われた可能性があります。同じ画面の使用量を確認し、下の手順でキーを作り直してください
 

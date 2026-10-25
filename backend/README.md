@@ -20,7 +20,7 @@ It handles Gemini API calls, keeping the API Key server-side.
     Add:
     *   `GEMINI_API_KEY`: Your Google AI Studio API Key.
     *   `GEMINI_MODEL` (optional): Gemini model ID. Default is `gemini-3.1-flash-lite`.
-    *   `KV_REST_API_URL` / `KV_REST_API_TOKEN`: set by the Upstash for Redis integration (rate limiting).
+    Rate limiting is in-memory per instance (10 requests / 60 s per IP); set a monthly spend cap on the Gemini project in AI Studio as the hard cost limit.
 
 4.  **Deploy**
     ```bash

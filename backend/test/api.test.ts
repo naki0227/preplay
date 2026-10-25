@@ -1,12 +1,10 @@
 // Run with: npm test
-// Reproduces the production failure: Upstash Redis unreachable (archived DB)
-// must not break /api/generate, and the Gemini key must never leak.
+// /api/generate works without any external store, is rate limited, and the
+// Gemini key never leaks.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.GEMINI_API_KEY = 'test-key-not-real-0123456789';
-process.env.KV_REST_API_URL = 'https://redis.invalid';
-process.env.KV_REST_API_TOKEN = 'x';
 
 const realFetch = globalThis.fetch;
 let geminiCalls: string[] = [];
@@ -18,9 +16,6 @@ globalThis.fetch = (async (input: any, init?: any) => {
       candidates: [{ content: { parts: [{ text: '**ゲーム名:** テスト\n**遊び方:** ルール' }] } }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
-  if (url.startsWith('https://redis.invalid')) {
-    return new Response('internal error', { status: 500 });
-  }
   return realFetch(input, init);
 }) as typeof fetch;
 
@@ -29,7 +24,7 @@ const { default: handler } = await import('../api/index.ts');
 const call = (path: string, init?: RequestInit) =>
   (handler as (req: Request) => Promise<Response>)(new Request(`http://localhost${path}`, init));
 
-test('generate works while Redis is down', async () => {
+test('generate returns the cleaned game text', async () => {
   geminiCalls = [];
   const res = await call('/api/generate', {
     method: 'POST',
@@ -44,7 +39,7 @@ test('generate works while Redis is down', async () => {
   assert.ok(!geminiCalls[0].includes('key='), 'key must be sent as header, not URL');
 });
 
-test('fallback limiter still limits', async () => {
+test('rate limit: 11th request in a minute gets 429', async () => {
   let last = 0;
   for (let i = 0; i < 11; i++) {
     const res = await call('/api/generate', {
@@ -63,4 +58,9 @@ test('health does not expose the key', async () => {
   assert.equal(res.status, 200);
   assert.ok(!text.includes('test-key'));
   assert.ok(!text.includes('keyPreview'));
+});
+
+test('removed Redis-backed /api/games is gone', async () => {
+  const res = await call('/api/games');
+  assert.equal(res.status, 404);
 });
