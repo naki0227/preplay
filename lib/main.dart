@@ -7,7 +7,6 @@ import 'state/app_state.dart';
 import 'ui/home_screen.dart';
 import 'theme/app_colors.dart';
 import 'config/app_config.dart';
-import 'services/community_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,10 +16,6 @@ void main() async {
         url: AppConfig.supabaseUrl,
         anonKey: AppConfig.supabaseAnonKey,
       );
-
-      // Seed initial data (Fire and Forget)
-      // In production, this should be done via admin script, but for MVP/Rescue:
-      CommunityService().seedDefaults();
     } catch (e) {
       print("Supabase init failed: $e");
       // Proceed without Cloud features

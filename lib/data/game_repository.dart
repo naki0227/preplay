@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/game_model.dart';
 import '../services/saved_games_service.dart';
 import '../services/community_service.dart';
@@ -21,14 +22,38 @@ class GameRepository {
     _savedGames = await _savedGamesService.loadSavedGames();
   }
 
+  static const _hiddenKey = 'preplay_hidden_community_games';
+
+  Future<Set<String>> _hiddenIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return (prefs.getStringList(_hiddenKey) ?? []).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
   Future<void> loadCommunityGames() async {
     _communityError = null;
     final result = await _communityService.fetchCommunityGames();
     if (result == null) {
       _communityError = '読み込みに失敗しました';
     } else {
-      _communityGames = result;
+      final hidden = await _hiddenIds();
+      _communityGames = result.where((g) => !hidden.contains(g.id)).toList();
     }
+  }
+
+  /// Reports a community game and hides it on this device right away,
+  /// even if the report could not be sent.
+  Future<void> reportGame(GameModel game) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hidden = await _hiddenIds()..add(game.id);
+      await prefs.setStringList(_hiddenKey, hidden.toList());
+    } catch (_) {}
+    _communityGames = _communityGames.where((g) => g.id != game.id).toList();
+    await _communityService.reportGame(game.id);
   }
 
   Future<bool> shareGame(GameModel game) async {

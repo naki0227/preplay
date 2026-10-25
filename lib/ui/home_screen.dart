@@ -71,7 +71,7 @@ class HomeScreen extends StatelessWidget {
       case PreplayState.detecting:
         return const DetectingView();
       case PreplayState.thinking:
-        return const DetectingView(message: 'AIが新しい遊びを生成中...\n(10秒ほどかかります)');
+        return const DetectingView(message: 'AIが新しい遊びを考えています...\n(数秒かかります)');
       case PreplayState.suggested:
         if (controller.currentGame != null) {
           return GameSuggestionView(game: controller.currentGame!, key: ValueKey(controller.currentGame!.id));

@@ -4,6 +4,7 @@
 |---|---|---|
 | `CI`（`.github/workflows/ci.yml`） | PR と main への push | アプリの analyze・test、バックエンドの typecheck・test、ストア同期ツールの test |
 | `iOS release`（`ios-release.yml`） | **手動のみ** | IPA をビルドする。「upload」にチェックを入れると、App Store Connect（TestFlight）へアップロードする |
+| `App Store screenshots`（`screenshots.yml`） | `integration_test/` などを変える PR と、手動 | iPhone 6.9 インチと iPad 13 インチのシミュレーターでアプリを動かしてスクリーンショットを撮り、`appstore/screenshots/` にコミットする |
 | `App Store metadata`（`appstore-metadata.yml`） | `appstore/` を変える PR と、main への push、手動 | `appstore/metadata.yaml` の内容を App Store Connect に反映する。PR では差分を表示するだけ（dry run）。main に入ると反映する |
 
 **審査への提出は自動化していません。** 最後は App Store Connect の画面で「審査へ提出」を押します。
@@ -42,6 +43,13 @@ https://github.com/naki0227/preplay/settings/secrets/actions を開き、**「Re
    - まず「upload」のチェックなしで実行して、ビルドが通るか確かめる（IPA は Artifacts に 7 日残ります）
    - 通ったら「upload」にチェックを入れて実行する。ビルド番号は実行した日時（UTC）から自動で決まります
 6. App Store Connect で、アップロードしたビルドをバージョンに選び、「審査へ提出」を押す
+
+## スクリーンショット
+
+- 撮る画面は `integration_test/screenshots_test.dart` に書いてある（提案、遊んでいるところ、お気に入り、「その場に合わせる」の説明）
+- Actions →「App Store screenshots」→ Run workflow で撮り直せる。撮った画像は同じブランチにコミットされ、Artifacts にも残る
+- サイズが App Store の規定（iPhone 1320×2868、iPad 2064×2752）と違うと失敗する
+- ストアに反映するのは `appstore/metadata.yaml` の `screenshots`。画像を差し替えたら、その PR の「App Store metadata」の dry run で差分を確認する
 
 ## 補足
 

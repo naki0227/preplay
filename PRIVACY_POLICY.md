@@ -11,6 +11,8 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 
 ### 2. 収集する情報
 
+位置情報・モーション・音声レベルは、アプリ内の「その場に合わせる」をオンにしたときだけ使います（初期状態はオフ）。
+
 #### 2.1 位置情報（任意）
 - **目的**: 移動速度を検知し、状況に合った遊びを提案するため
 - **収集方法**: デバイスのGPSセンサー
@@ -30,6 +32,7 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 - **目的**: 「みんなの遊び」機能でゲームを共有するため
 - **収集方法**: ユーザーが自発的に投稿
 - **保存**: Supabase（クラウドデータベース）に保存
+- **通報**: 不適切な投稿を通報すると、対象の遊びの ID と日時だけを保存します（通報した人の情報は保存しません）
 
 #### 2.5 AIによる遊びの生成
 - **目的**: 「AIで生成」を使ったときに、状況に合った遊びを作るため
@@ -55,6 +58,8 @@ Preplay ("the App") respects user privacy and is committed to protecting persona
 
 ### 2. Information We Collect
 
+Location, motion and audio level are used only when "その場に合わせる" (match the situation) is turned on in the App. It is off by default.
+
 #### 2.1 Location Data (Optional)
 - **Purpose**: To detect movement speed and suggest appropriate games
 - **Method**: Device GPS sensor
@@ -74,6 +79,7 @@ Preplay ("the App") respects user privacy and is committed to protecting persona
 - **Purpose**: To share games via the "Community Games" feature
 - **Method**: Voluntarily submitted by users
 - **Storage**: Stored in Supabase (cloud database)
+- **Reports**: When you report a post, only the game's ID and the time are stored (nothing about the reporter)
 
 #### 2.5 AI Game Generation
 - **Purpose**: To generate a game when you use the AI generation feature

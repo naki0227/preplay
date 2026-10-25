@@ -53,24 +53,17 @@ class CommunityService {
     }
   }
 
-  Future<void> seedDefaults() async {
+  /// Records a report. Games with enough reports are hidden for everyone by
+  /// the select policy in supabase_schema.sql. Returns false on failure.
+  Future<bool> reportGame(String gameId) async {
     final client = _client;
-    if (client == null) return;
-    for (final game in GameModel.mvpGames) {
-      // Use upsert or ignore duplicate error
-      try {
-        await client.from('games').upsert({
-          'id': game.id,
-          'title': game.title,
-          'rules': game.rules,
-          'origin': 'Preplay Official', 
-          'tags': game.tags,
-          'topics': game.topics,
-        });
-      } catch (e) {
-        // Ignore specific duplicates if upsert isn't working as expected
-        print('Seed Error for ${game.title}: $e');
-      }
+    if (client == null) return false;
+    try {
+      await client.from('reports').insert({'game_id': gameId});
+      return true;
+    } catch (e) {
+      print('Community Report Error: $e');
+      return false;
     }
   }
 }

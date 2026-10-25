@@ -13,8 +13,32 @@ class SituationService {
   factory SituationService() => _instance;
   SituationService._internal();
 
+  /// Asks for the permissions context sensing needs. Only called after the
+  /// user turned the feature on and saw why it is needed.
+  /// Returns true if at least one sensor can be used.
+  Future<bool> requestPermissions() async {
+    bool granted = false;
+    try {
+      if (Platform.isMacOS) {
+        final status = await Geolocator.requestPermission();
+        granted = status == LocationPermission.always || status == LocationPermission.whileInUse;
+      } else {
+        granted = (await Permission.locationWhenInUse.request()).isGranted;
+      }
+    } catch (e) {
+      print('Location permission error: $e');
+    }
+    try {
+      if ((await Permission.microphone.request()).isGranted) granted = true;
+    } catch (e) {
+      print('Microphone permission error: $e');
+    }
+    return granted;
+  }
+
   /// Determine the current context tags based on sensors.
-  /// Takes about 0.5s - 1.0s to gather data.
+  /// Never shows a permission prompt; sensors without permission are skipped.
+  /// Takes about 0.5s - 1.5s to gather data.
   Future<List<String>> determineContext() async {
     List<String> detectedTags = [];
 
@@ -44,24 +68,20 @@ class SituationService {
     try {
       bool hasLocationPermission = false;
       if (Platform.isMacOS) {
-         // macOS: permission_handler might fail, rely on Geolocator's internal check or assume handled by OS
-         final status = await Geolocator.checkPermission();
-         hasLocationPermission = status == LocationPermission.always || status == LocationPermission.whileInUse;
-         if (status == LocationPermission.denied) {
-            // Try request via Geolocator directly if possible, or just skip
-            final requestStatus = await Geolocator.requestPermission();
-             hasLocationPermission = requestStatus == LocationPermission.always || requestStatus == LocationPermission.whileInUse;
-         }
+        final status = await Geolocator.checkPermission();
+        hasLocationPermission = status == LocationPermission.always || status == LocationPermission.whileInUse;
       } else {
-         // Mobile: Use permission_handler
-         if (await Permission.location.request().isGranted) {
-          hasLocationPermission = true;
-         }
+        hasLocationPermission = await Permission.locationWhenInUse.isGranted;
       }
 
       if (hasLocationPermission) {
+        // A cold GPS fix can take many seconds; give up quickly so "次" stays fast.
         Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium);
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(milliseconds: 1500),
+          ),
+        );
         
         if (position.speed > 0.5) {
           tags.add('walking');
@@ -111,7 +131,7 @@ class SituationService {
     List<String> tags = [];
     
     try {
-      if (await Permission.microphone.request().isGranted) {
+      if (await Permission.microphone.isGranted) {
         // Start "recording" briefly to get decibels
         final Completer<double> decibelCompleter = Completer();
         NoiseMeter noiseMeter = NoiseMeter();

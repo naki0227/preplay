@@ -208,17 +208,83 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
             },
             title: Text(game.title, style: const TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(game.rules.replaceAll('\n', ' '), maxLines: 1, overflow: TextOverflow.ellipsis),
-            trailing: CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () => controller.toggleSave(game),
-              child: Icon(
-                isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
-              ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => controller.toggleSave(game),
+                  child: Icon(
+                    isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                    color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
+                  ),
+                ),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showCommunityActions(context, controller, game),
+                  child: const Icon(CupertinoIcons.ellipsis, color: CupertinoColors.systemGrey),
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showCommunityActions(BuildContext context, PreplayController controller, GameModel game) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: Text(game.title),
+        actions: [
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _confirmReport(context, controller, game);
+            },
+            child: const Text('不適切な内容として通報'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
+  void _confirmReport(BuildContext context, PreplayController controller, GameModel game) {
+    showCupertinoDialog(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('通報しますか？'),
+        content: const Text('この遊びはあなたの画面に表示されなくなります。通報が集まった遊びは、みんなの画面からも消えます。'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('キャンセル'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('通報する'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await controller.reportGame(game);
+              if (!context.mounted) return;
+              showCupertinoDialog(
+                context: context,
+                builder: (c) => CupertinoAlertDialog(
+                  title: const Text('通報しました'),
+                  content: const Text('ご協力ありがとうございます。内容を確認して対応します。\nお問い合わせ: contact@enludus.com'),
+                  actions: [CupertinoDialogAction(child: const Text('OK'), onPressed: () => Navigator.pop(c))],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 

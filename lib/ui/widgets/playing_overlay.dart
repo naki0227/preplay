@@ -140,7 +140,7 @@ class PlayingOverlay extends StatelessWidget {
                 child: const Text('終わり', style: TextStyle(fontWeight: FontWeight.w600)),
                 onPressed: () {
                   HapticFeedback.lightImpact();
-                  controller.stopGame();
+                  controller.finishGame();
                 },
               ),
             ),
