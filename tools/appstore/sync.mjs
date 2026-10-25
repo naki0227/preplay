@@ -311,6 +311,8 @@ async function syncScreenshots(api, locId, locale, wantedSets, opts) {
       log(`= ${label}: no changes`);
       continue;
     }
+    log(`  ${label} existing: ${existing.map((e) => `${e.attributes.fileName} md5=${e.attributes.sourceFileChecksum ?? 'none'}`).join(' | ') || '(none)'}`);
+    log(`  ${label} wanted:   ${files.map((f) => `${f.fileName} md5=${f.md5}`).join(' | ')}`);
     const toUpload = files.filter((f) => !existingMd5.includes(f.md5));
     const toDelete = existing.filter((e) => !files.some((f) => f.md5 === e.attributes.sourceFileChecksum));
     log(`~ ${label}: upload ${toUpload.length}, delete ${toDelete.length}, then order as listed (${files.map((f) => f.fileName).join(', ')})`);
