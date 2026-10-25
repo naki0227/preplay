@@ -6,7 +6,8 @@
 // Env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (contents of the .p8 file).
 // Only fields present in the YAML are changed. Never submits for review.
 import { readFileSync } from 'node:fs';
-import { createPrivateKey, sign } from 'node:crypto';
+import { dirname, resolve, basename } from 'node:path';
+import { createHash, createPrivateKey, sign } from 'node:crypto';
 import { parse } from 'yaml';
 
 const API = 'https://api.appstoreconnect.apple.com';
@@ -79,7 +80,8 @@ const EDITABLE_VERSION_STATES = new Set([
   'INVALID_BINARY',
 ]);
 
-export async function sync(api, meta, { apply, log = console.log } = {}) {
+export async function sync(api, meta, opts = {}) {
+  const { apply, log = console.log } = opts;
   const mode = apply ? 'APPLY' : 'DRY RUN';
   log(`[${mode}] ${meta.bundleId}`);
 
@@ -91,7 +93,7 @@ export async function sync(api, meta, { apply, log = console.log } = {}) {
 
   // --- App Store version ---
   const { versionString, ...versionAttrs } = meta.version || {};
-  if (versionString) pending += await syncVersion(api, app, versionString, versionAttrs, meta, { apply, log });
+  if (versionString) pending += await syncVersion(api, app, versionString, versionAttrs, meta, { ...opts, log });
 
   // --- App information (privacy policy URL etc.) ---
   if (meta.appInfo) {
@@ -126,7 +128,8 @@ export async function sync(api, meta, { apply, log = console.log } = {}) {
 
 // Creates the version if needed and syncs its localizations.
 // App info only becomes editable once a new version exists, so this runs first.
-async function syncVersion(api, app, versionString, versionAttrs, meta, { apply, log }) {
+async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
+  const { apply, log } = opts;
   let pending = 0;
 
   const versions = await api(
@@ -164,34 +167,118 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, { apply,
   }
 
   const vlocs = await api('GET', `/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`);
-  for (const [locale, wanted] of Object.entries(meta.localizations || {})) {
-    const loc = vlocs.data.find((l) => l.attributes.locale === locale);
+  for (const [locale, entry] of Object.entries(meta.localizations || {})) {
+    // screenshots are handled separately; everything else is a text attribute
+    const { screenshots, ...wanted } = entry || {};
+    let loc = vlocs.data.find((l) => l.attributes.locale === locale);
     if (!loc) {
       log(`+ localization[${locale}]: will be created`);
       pending++;
-      if (apply) {
-        await api('POST', '/v1/appStoreVersionLocalizations', {
-          data: {
-            type: 'appStoreVersionLocalizations',
-            attributes: { locale, ...wanted },
-            relationships: { appStoreVersion: { data: { type: 'appStoreVersions', id: version.id } } },
-          },
-        });
+      if (!apply) continue;
+      const created = await api('POST', '/v1/appStoreVersionLocalizations', {
+        data: {
+          type: 'appStoreVersionLocalizations',
+          attributes: { locale, ...wanted },
+          relationships: { appStoreVersion: { data: { type: 'appStoreVersions', id: version.id } } },
+        },
+      });
+      loc = created.data;
+    } else {
+      const changes = diff(loc.attributes, wanted);
+      printChanges(`localization[${locale}]`, loc.attributes, changes);
+      if (Object.keys(changes).length) {
+        pending++;
+        if (apply) {
+          await api('PATCH', `/v1/appStoreVersionLocalizations/${loc.id}`, {
+            data: { type: 'appStoreVersionLocalizations', id: loc.id, attributes: changes },
+          });
+        }
       }
-      continue;
     }
-    const changes = diff(loc.attributes, wanted);
-    printChanges(`localization[${locale}]`, loc.attributes, changes);
-    if (Object.keys(changes).length) {
-      pending++;
-      if (apply) {
-        await api('PATCH', `/v1/appStoreVersionLocalizations/${loc.id}`, {
-          data: { type: 'appStoreVersionLocalizations', id: loc.id, attributes: changes },
-        });
-      }
-    }
+    if (screenshots) pending += await syncScreenshots(api, loc.id, locale, screenshots, opts);
   }
 
+  return pending;
+}
+
+// --- Screenshots ---
+// For each display type listed in the YAML, make the set match the listed
+// files exactly (same images, same order). Display types not listed are left
+// alone. Files are compared by MD5, so unchanged images are not re-uploaded.
+function loadFile(baseDir, path) {
+  const full = resolve(baseDir, path);
+  const data = readFileSync(full);
+  return { path, fileName: basename(full), data, md5: createHash('md5').update(data).digest('hex') };
+}
+
+async function defaultUpload(op, data) {
+  const res = await fetch(op.url, {
+    method: op.method,
+    headers: Object.fromEntries((op.requestHeaders || []).map((h) => [h.name, h.value])),
+    body: data.subarray(op.offset, op.offset + op.length),
+  });
+  if (!res.ok) throw new Error(`upload ${op.method} -> ${res.status}`);
+}
+
+async function syncScreenshots(api, locId, locale, wantedSets, opts) {
+  const { apply, log, baseDir = '.', upload = defaultUpload, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = opts;
+  let pending = 0;
+  const sets = locId ? (await api('GET', `/v1/appStoreVersionLocalizations/${locId}/appScreenshotSets`)).data : [];
+
+  for (const [displayType, paths] of Object.entries(wantedSets)) {
+    const files = paths.map((p) => loadFile(baseDir, p));
+    let set = sets.find((s) => s.attributes.screenshotDisplayType === displayType);
+    const existing = set ? (await api('GET', `/v1/appScreenshotSets/${set.id}/appScreenshots`)).data : [];
+    const existingMd5 = existing.map((e) => e.attributes.sourceFileChecksum);
+    const label = `screenshots[${locale}][${displayType}]`;
+
+    if (JSON.stringify(existingMd5) === JSON.stringify(files.map((f) => f.md5))) {
+      log(`= ${label}: no changes`);
+      continue;
+    }
+    const toUpload = files.filter((f) => !existingMd5.includes(f.md5));
+    const toDelete = existing.filter((e) => !files.some((f) => f.md5 === e.attributes.sourceFileChecksum));
+    log(`~ ${label}: upload ${toUpload.length}, delete ${toDelete.length}, then order as listed (${files.map((f) => f.fileName).join(', ')})`);
+    pending++;
+    if (!apply) continue;
+
+    if (!set) {
+      set = (await api('POST', '/v1/appScreenshotSets', {
+        data: {
+          type: 'appScreenshotSets',
+          attributes: { screenshotDisplayType: displayType },
+          relationships: { appStoreVersionLocalization: { data: { type: 'appStoreVersionLocalizations', id: locId } } },
+        },
+      })).data;
+    }
+
+    const idByMd5 = Object.fromEntries(existing.map((e) => [e.attributes.sourceFileChecksum, e.id]));
+    for (const f of toUpload) {
+      const reserved = (await api('POST', '/v1/appScreenshots', {
+        data: {
+          type: 'appScreenshots',
+          attributes: { fileName: f.fileName, fileSize: f.data.length },
+          relationships: { appScreenshotSet: { data: { type: 'appScreenshotSets', id: set.id } } },
+        },
+      })).data;
+      for (const op of reserved.attributes.uploadOperations || []) await upload(op, f.data);
+      await api('PATCH', `/v1/appScreenshots/${reserved.id}`, {
+        data: { type: 'appScreenshots', id: reserved.id, attributes: { uploaded: true, sourceFileChecksum: f.md5 } },
+      });
+      // Wait for Apple to process the image so size errors show up here.
+      for (let i = 0; i < 30; i++) {
+        const state = (await api('GET', `/v1/appScreenshots/${reserved.id}`)).data.attributes.assetDeliveryState?.state;
+        if (state === 'COMPLETE') break;
+        if (state === 'FAILED') throw new Error(`${label}: Apple rejected ${f.path} (check the image size for ${displayType})`);
+        await sleep(2000);
+      }
+      idByMd5[f.md5] = reserved.id;
+    }
+    for (const e of toDelete) await api('DELETE', `/v1/appScreenshots/${e.id}`);
+    await api('PATCH', `/v1/appScreenshotSets/${set.id}/relationships/appScreenshots`, {
+      data: files.map((f) => ({ type: 'appScreenshots', id: idByMd5[f.md5] })),
+    });
+  }
   return pending;
 }
 
@@ -213,7 +300,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     issuerId: process.env.ASC_ISSUER_ID,
     privateKey: process.env.ASC_KEY_P8,
   });
-  sync(createClient(token), meta, { apply: flag === '--apply' }).catch((e) => {
+  sync(createClient(token), meta, { apply: flag === '--apply', baseDir: dirname(resolve(file)) }).catch((e) => {
     console.error(e.message);
     process.exit(1);
   });

@@ -2,7 +2,9 @@
 # CD (.github/workflows/appstore-metadata.yml) applies this file:
 #   - pull request: dry run (shows what would change)
 #   - push to main: applies the changes
-# Only fields written here are touched. Delete a field to leave it as is.
+# Patch semantics: only fields written here are touched. Anything not
+# written (keywords, screenshots, other locales...) stays as it is in
+# App Store Connect. Add a field only when you want to change it.
 # Submission for review is NOT automated; do that in App Store Connect.
 
 bundleId: com.preplay.preplay
@@ -20,6 +22,20 @@ appInfo:
 # Version information, per locale
 localizations:
   ja:
+    # Examples (uncomment to manage):
+    # keywords: 暇つぶし,遊び,パーティーゲーム,しりとり   # comma separated, max 100 chars
+    # promotionalText: ...                                # can change without a new review
+    #
+    # screenshots: one list per display type, paths relative to this file.
+    # Only the display types listed are replaced (same images, same order);
+    # unchanged images are not re-uploaded. Other display types are untouched.
+    #   APP_IPHONE_67: 6.9"/6.7" (1320x2868 or 1290x2796)  <- required for iPhone
+    #   APP_IPHONE_65: 6.5"      (1284x2778 or 1242x2688)
+    #   APP_IPAD_PRO_3GEN_129: 13"/12.9" iPad (2048x2732)
+    # screenshots:
+    #   APP_IPHONE_67:
+    #     - screenshots/ja/iphone67/1.png
+    #     - screenshots/ja/iphone67/2.png
     supportUrl: https://enludus.com
     marketingUrl: https://enludus.com
     whatsNew: |-

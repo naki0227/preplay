@@ -22,7 +22,7 @@
 
 ### 2. GitHub の Secrets に登録する
 
-https://github.com/naki0227/preplay/settings/secrets/actions → 「New repository secret」で、次の 3 つを登録する。
+https://github.com/naki0227/preplay/settings/secrets/actions を開き、**「Repository secrets」**の「New repository secret」で次の 3 つを登録する（Environment secrets や Variables ではない）。
 
 | 名前 | 値 |
 |---|---|
@@ -46,5 +46,10 @@ https://github.com/naki0227/preplay/settings/secrets/actions → 「New reposito
 ## 補足
 
 - **GitHub Actions の macOS ランナーは時間がかかります。** 1 回のビルドで 20〜30 分ほどです。プライベートリポジトリだと、無料枠を Linux の 10 倍の速さで使います。このリポジトリは公開なので、無料で使えます
-- `appstore/metadata.yaml` に書いた項目だけを変えます。書いていない項目（キーワード、スクリーンショット、価格など）には触りません
+- `appstore/metadata.yaml` は**差分更新（パッチ）**です。書いた項目だけを変え、書いていない項目には触りません
+  - キーワードを変えたいとき: `localizations.ja.keywords` を書き足す
+  - スクリーンショットを変えたいとき: 画像を `appstore/screenshots/...` に置き、`localizations.ja.screenshots.<表示サイズ>` に並べる。並べたサイズだけが、その画像・その順番に置き換わります。同じ画像は再アップロードしません。サイズが合わないと Apple に拒否され、ワークフローが失敗して教えてくれます
+  - 書き方の例は `metadata.yaml` のコメントにあります
+  - `assets/screenshot/` の画像は 1179×2556（6.1 インチ）なので、今の App Store の必須サイズ（6.9 インチ: 1320×2868 か 1290×2796）には使えません
+- 価格・配信国・年齢制限・App のプライバシーの申告は、このツールでは扱いません
 - 公開中のバージョンの文面は Apple の仕様で編集できません。新しいバージョンを作ってから反映されます

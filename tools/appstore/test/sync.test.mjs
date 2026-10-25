@@ -82,3 +82,89 @@ test('metadata version matches pubspec.yaml', () => {
   const v = pubspec.match(/^version:\s*([0-9.]+)/m)[1];
   assert.equal(meta.version.versionString, v);
 });
+
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+
+function screenshotApi(existing) {
+  const calls = [];
+  let next = 0;
+  const api = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (path.startsWith('/v1/apps?')) return { data: [{ id: 'APP' }] };
+    if (path.startsWith('/v1/apps/APP/appStoreVersions')) {
+      return { data: [{ id: 'VER', attributes: { appStoreState: 'PREPARE_FOR_SUBMISSION' } }] };
+    }
+    if (path === '/v1/appStoreVersions/VER/appStoreVersionLocalizations') {
+      return { data: [{ id: 'VLOC', attributes: { locale: 'ja', keywords: 'old' } }] };
+    }
+    if (path === '/v1/appStoreVersionLocalizations/VLOC/appScreenshotSets') {
+      return { data: [{ id: 'SET67', attributes: { screenshotDisplayType: 'APP_IPHONE_67' } }] };
+    }
+    if (path === '/v1/appScreenshotSets/SET67/appScreenshots') {
+      return { data: existing.map((md5, i) => ({ id: `OLD${i}`, attributes: { sourceFileChecksum: md5 } })) };
+    }
+    if (method === 'POST' && path === '/v1/appScreenshots') {
+      return { data: { id: `NEW${next++}`, attributes: { uploadOperations: [{ method: 'PUT', url: 'https://upload.invalid', offset: 0, length: body.data.attributes.fileSize, requestHeaders: [] }] } } };
+    }
+    if (method === 'GET' && path.startsWith('/v1/appScreenshots/')) {
+      return { data: { attributes: { assetDeliveryState: { state: 'COMPLETE' } } } };
+    }
+    if (method === 'PATCH' || method === 'DELETE') return null;
+    throw new Error(`unexpected ${method} ${path}`);
+  };
+  return { api, calls };
+}
+
+function tempImages(...contents) {
+  const dir = mkdtempSync(join(tmpdir(), 'shots-'));
+  const names = contents.map((c, i) => {
+    writeFileSync(join(dir, `${i + 1}.png`), c);
+    return `${i + 1}.png`;
+  });
+  const md5 = contents.map((c) => createHash('md5').update(c).digest('hex'));
+  return { dir, names, md5 };
+}
+
+test('keywords are just another patched field', async () => {
+  const { api, calls } = screenshotApi([]);
+  await sync(api, { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { keywords: 'あそび,暇つぶし' } } }, { apply: true, log: () => {} });
+  const patch = calls.find((c) => c.method === 'PATCH' && c.path === '/v1/appStoreVersionLocalizations/VLOC');
+  assert.deepEqual(patch.body.data.attributes, { keywords: 'あそび,暇つぶし' });
+});
+
+test('screenshots: unchanged set does nothing', async () => {
+  const img = tempImages('a', 'b');
+  const { api, calls } = screenshotApi(img.md5);
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { screenshots: { APP_IPHONE_67: img.names } } } };
+  const pending = await sync(api, meta, { apply: true, baseDir: img.dir, log: () => {} });
+  assert.equal(pending, 0);
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+test('screenshots: uploads new, deletes removed, keeps unchanged, orders as listed', async () => {
+  const img = tempImages('keep', 'new');
+  const removed = createHash('md5').update('gone').digest('hex');
+  const { api, calls } = screenshotApi([removed, img.md5[0]]);
+  const uploads = [];
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { screenshots: { APP_IPHONE_67: img.names } } } };
+  await sync(api, meta, { apply: true, baseDir: img.dir, log: () => {}, upload: async (op, data) => uploads.push(data.toString()), sleep: async () => {} });
+  assert.deepEqual(uploads, ['new']);
+  const commit = calls.find((c) => c.method === 'PATCH' && c.path === '/v1/appScreenshots/NEW0');
+  assert.equal(commit.body.data.attributes.sourceFileChecksum, img.md5[1]);
+  assert.ok(calls.some((c) => c.method === 'DELETE' && c.path === '/v1/appScreenshots/OLD0'));
+  assert.ok(!calls.some((c) => c.method === 'DELETE' && c.path === '/v1/appScreenshots/OLD1'));
+  const order = calls.find((c) => c.path === '/v1/appScreenshotSets/SET67/relationships/appScreenshots');
+  assert.deepEqual(order.body.data.map((d) => d.id), ['OLD1', 'NEW0']);
+});
+
+test('screenshots: dry run does not upload', async () => {
+  const img = tempImages('x');
+  const { api, calls } = screenshotApi([]);
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { screenshots: { APP_IPHONE_67: img.names } } } };
+  const pending = await sync(api, meta, { apply: false, baseDir: img.dir, log: () => {} });
+  assert.equal(pending, 1);
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
