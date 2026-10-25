@@ -80,6 +80,16 @@ curl -X POST https://preplay-five.vercel.app/api/generate \
 - Redis を使っていた `/api/games` も削除した（アプリからは使われていなかった）
 - Vercel の Storage にある古い `preplay-kv` は、もう使わないので削除してよい: https://vercel.com/nakis-projects-d1ae2531/preplay/stores
 
+### API の保護（2026-10-25）
+
+`/api/generate` は認証なしで誰でも呼べる。アプリに入れた秘密は取り出せるので、アプリと共有する鍵では守れない。代わりに次の 3 つで、使われ方と費用を絞っている。
+
+1. **入力を固定の値だけにする**: `tags` はアプリが送る 7 語（all / active / noisy / quiet / standing / waiting / walking）だけ、`groupSize` は 1〜20 だけ受け付ける。自由な文章はプロンプトに入らないので、汎用の AI として使うことはできない（それ以外は 400）
+2. **回数の制限**: IP ごとに 60 秒 10 回まで（インスタンスごと）
+3. **費用の上限**: AI Studio の Monthly spend cap（$5）。超えるとその月は AI 生成が止まるだけで、請求は増えない
+
+もっと強く守りたい場合は、iOS の App Attest で「本物のアプリからのリクエストか」を確かめる方法がある。アプリとバックエンドの両方に手を入れる必要があり、公開中の 1.0 からは AI 生成が使えなくなる。
+
 ### C. Gemini のクレジット補充とキーの作り直し（重要）
 
 0. **月の上限（Monthly spend cap）を設定する**: AI Studio の Spend ページ →「Monthly spend cap」→「Edit spend cap」で **$5** などにする。Redis をやめたので、これが費用の上限になる
