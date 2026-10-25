@@ -25,7 +25,7 @@
 | 1 | 「AIで生成」が必ず失敗し、普通の提案に戻る | Upstash Redis（レート制限用）が非アクティブでアーカイブされた。レート制限の呼び出しが例外を投げ、Gemini を呼ぶ前に 500 になる | Redis に繋がらないときは、インスタンス内メモリのレート制限に切り替えて処理を続ける（`backend/api/index.ts`） | **直した**（要再デプロイ → A） |
 | 2 | Redis を戻さないとレート制限が弱い | #1 と同じ | Upstash DB の復元または作り直し | **直した**（2026-10-25: Redis をやめた。下の B） |
 | 3 | Redis が直っても AI 生成が失敗する | モデル `gemini-1.5-flash` は提供終了 | Gemini REST API を直接呼ぶ形にし、モデルを `gemini-3.1-flash-lite` に変更。`GEMINI_MODEL` 環境変数で変えられるようにした。非推奨の `@google/generative-ai` SDK を外した | **直した**（要再デプロイ → A） |
-| 4 | Redis を迂回しても AI 生成が 500 | 再デプロイ後の確認で、Gemini API が **402 RESOURCE_EXHAUSTED「prepayment credits are depleted」** を返した。キーは認証を通り、モデル名も通っている。止まっている原因はキーの失効ではなく、前払いクレジットの残高切れ | AI Studio でクレジットを補充する。キーは 2026-02-06 から変わっていないので、作り直しも勧める | **オーナーの作業待ち → C** |
+| 4 | Redis を迂回しても AI 生成が 500 | 再デプロイ後の確認で、Gemini API が **402 RESOURCE_EXHAUSTED「prepayment credits are depleted」** を返した。キーは認証を通り、モデル名も通っている。止まっている原因はキーの失効ではなく、前払いクレジットの残高切れ | AI Studio でクレジットを補充する。キーは 2026-02-06 から変わっていないので、作り直しも勧める | **直した**（2026-10-25: 新しいキーを Secret で登録し直し、クレジットを補充。本番の `/api/generate` が 200 を返し、アプリと同じ書式で読み取れることを確認） |
 | 5 | キーの流出経路 | 2026-02-06 以前、アプリは `.env` をアセットとして同梱し、そこから `GEMINI_API_KEY` を読んでいた。同梱した `.env` は IPA から誰でも取り出せる。公開版 1.0 も `.env` を同梱している | `.env` の同梱と `flutter_dotenv` をやめた。アプリには `--dart-define-from-file` で公開してよい値（バックエンド URL、Supabase URL/anon key）だけを渡す。Gemini キーはバックエンドだけに置く | **直した** |
 | 6 | `/api/health` がキーの先頭 10 文字を公開している | `keyPreview` を返していた | 削除。`hasApiKey` と `model` だけを返す | **直した**（要再デプロイ → A） |
 | 7 | アプリが `API_SECRET` を送っている | バックエンドは検証しておらず、アプリに入れた値は秘密にならない | アプリから削除。README と `.env.example` からも削除 | **直した** |
