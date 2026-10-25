@@ -28,9 +28,11 @@ localizations:
     # keywords: 暇つぶし,遊び,パーティーゲーム,しりとり   # comma separated, max 100 chars
     # promotionalText: ...                                # can change without a new review
     #
-    # screenshots: one list per display type, paths relative to this file.
+    # screenshots: one list per display type. Each entry is a path relative
+    # to this file (uploaded unless the same image is already there) or
+    # "keep: <file name>" to reuse an image already in App Store Connect.
     # Only the display types listed are replaced (same images, same order);
-    # unchanged images are not re-uploaded. Other display types are untouched.
+    # other display types are untouched.
     #   APP_IPHONE_67: 6.9"/6.7" (1320x2868 or 1290x2796)  <- required for iPhone
     #   APP_IPHONE_65: 6.5"      (1284x2778 or 1242x2688)
     #   APP_IPAD_PRO_3GEN_129: 13"/12.9" iPad (2048x2732)
@@ -44,14 +46,16 @@ localizations:
     promotionalText: ワードウルフ、ウミガメのスープ、山手線ゲームなど42種類。道具も準備もいらない「その場で遊べるゲーム」を、ボタンひとつで提案します。
     supportUrl: https://enludus.com
     marketingUrl: https://enludus.com
-    # iPhone screenshots in the order they were taken. iPad ones are not
-    # listed, so they stay as they are.
+    # iPhone screenshots in the order they were taken. "keep" reuses the
+    # images already in App Store Connect (they were resized for the 6.5"
+    # slot, so the originals in assets/screenshot are not uploaded again).
+    # iPad ones are not listed, so they stay as they are.
     screenshots:
       APP_IPHONE_65:
-        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.00.59.png
-        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.10.png
-        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.25.png
-        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.28.png
+        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.00.59.png
+        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.10.png
+        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.25.png
+        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.28.png
     whatsNew: |-
       いくつかの不具合を修正しました。
 

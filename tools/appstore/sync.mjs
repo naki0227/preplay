@@ -300,22 +300,38 @@ async function syncScreenshots(api, locId, locale, wantedSets, opts) {
   let pending = 0;
   const sets = locId ? (await api('GET', `/v1/appStoreVersionLocalizations/${locId}/appScreenshotSets`)).data : [];
 
-  for (const [displayType, paths] of Object.entries(wantedSets)) {
-    const files = paths.map((p) => loadFile(baseDir, p));
+  for (const [displayType, entries] of Object.entries(wantedSets)) {
     let set = sets.find((s) => s.attributes.screenshotDisplayType === displayType);
     const existing = set ? (await api('GET', `/v1/appScreenshotSets/${set.id}/appScreenshots`)).data : [];
-    const existingMd5 = existing.map((e) => e.attributes.sourceFileChecksum);
     const label = `screenshots[${locale}][${displayType}]`;
 
-    if (JSON.stringify(existingMd5) === JSON.stringify(files.map((f) => f.md5))) {
+    // Each entry is a local file path (uploaded unless an identical image is
+    // already there) or { keep: <file name> } to reuse an image that is
+    // already in App Store Connect (e.g. to only change the order).
+    const wanted = entries.map((entry) => {
+      if (entry && typeof entry === 'object' && 'keep' in entry) {
+        const match = existing.find((e) => e.attributes.fileName === entry.keep);
+        if (!match) {
+          const have = existing.map((e) => e.attributes.fileName).join(', ') || '(none)';
+          throw new Error(`${label}: keep "${entry.keep}" is not in App Store Connect (have: ${have})`);
+        }
+        return { keepId: match.id, fileName: entry.keep };
+      }
+      const f = loadFile(baseDir, entry);
+      const match = existing.find((e) => e.attributes.sourceFileChecksum === f.md5);
+      return match ? { keepId: match.id, fileName: f.fileName } : { ...f };
+    });
+
+    const unchanged =
+      existing.length === wanted.length && wanted.every((w, i) => w.keepId === existing[i].id);
+    if (unchanged) {
       log(`= ${label}: no changes`);
       continue;
     }
-    log(`  ${label} existing: ${existing.map((e) => `${e.attributes.fileName} md5=${e.attributes.sourceFileChecksum ?? 'none'}`).join(' | ') || '(none)'}`);
-    log(`  ${label} wanted:   ${files.map((f) => `${f.fileName} md5=${f.md5}`).join(' | ')}`);
-    const toUpload = files.filter((f) => !existingMd5.includes(f.md5));
-    const toDelete = existing.filter((e) => !files.some((f) => f.md5 === e.attributes.sourceFileChecksum));
-    log(`~ ${label}: upload ${toUpload.length}, delete ${toDelete.length}, then order as listed (${files.map((f) => f.fileName).join(', ')})`);
+    const toUpload = wanted.filter((w) => !w.keepId);
+    const keptIds = new Set(wanted.filter((w) => w.keepId).map((w) => w.keepId));
+    const toDelete = existing.filter((e) => !keptIds.has(e.id));
+    log(`~ ${label}: upload ${toUpload.length}, delete ${toDelete.length}, then order as listed (${wanted.map((w) => w.fileName).join(', ')})`);
     pending++;
     if (!apply) continue;
 
@@ -329,7 +345,6 @@ async function syncScreenshots(api, locId, locale, wantedSets, opts) {
       })).data;
     }
 
-    const idByMd5 = Object.fromEntries(existing.map((e) => [e.attributes.sourceFileChecksum, e.id]));
     for (const f of toUpload) {
       const reserved = (await api('POST', '/v1/appScreenshots', {
         data: {
@@ -349,11 +364,11 @@ async function syncScreenshots(api, locId, locale, wantedSets, opts) {
         if (state === 'FAILED') throw new Error(`${label}: Apple rejected ${f.path} (check the image size for ${displayType})`);
         await sleep(2000);
       }
-      idByMd5[f.md5] = reserved.id;
+      f.keepId = reserved.id;
     }
     for (const e of toDelete) await api('DELETE', `/v1/appScreenshots/${e.id}`);
     await api('PATCH', `/v1/appScreenshotSets/${set.id}/relationships/appScreenshots`, {
-      data: files.map((f) => ({ type: 'appScreenshots', id: idByMd5[f.md5] })),
+      data: wanted.map((w) => ({ type: 'appScreenshots', id: w.keepId })),
     });
   }
   return pending;

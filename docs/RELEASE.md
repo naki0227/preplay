@@ -49,6 +49,7 @@ https://github.com/naki0227/preplay/settings/secrets/actions を開き、**「Re
 - `appstore/metadata.yaml` は**差分更新（パッチ）**です。書いた項目だけを変え、書いていない項目には触りません
   - キーワードを変えたいとき: `localizations.ja.keywords` を書き足す
   - スクリーンショットを変えたいとき: 画像を `appstore/screenshots/...` に置き、`localizations.ja.screenshots.<表示サイズ>` に並べる。並べたサイズだけが、その画像・その順番に置き換わります。同じ画像は再アップロードしません。サイズが合わないと Apple に拒否され、ワークフローが失敗して教えてくれます
+  - 並び順だけ変えたいとき: `- keep: <ファイル名>` と書くと、App Store Connect にある画像をそのまま使います（ファイル名は dry run のログ末尾に出ます）
   - 書き方の例は `metadata.yaml` のコメントにあります
   - `assets/screenshot/` の画像は 1179×2556（6.1 インチ）なので、今の App Store の必須サイズ（6.9 インチ: 1320×2868 か 1290×2796）には使えません
 - 価格・配信国・年齢制限・App のプライバシーの申告は、このツールでは扱いません

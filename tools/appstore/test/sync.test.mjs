@@ -64,7 +64,9 @@ test('screenshot files listed in metadata.yaml exist', async () => {
   const base = new URL('../../../appstore/', import.meta.url);
   for (const loc of Object.values(fullMeta.localizations || {})) {
     for (const paths of Object.values(loc.screenshots || {})) {
-      for (const p of paths) assert.ok(existsSync(new URL(p.replaceAll(' ', '%20'), base)), p);
+      for (const p of paths) {
+        if (typeof p === 'string') assert.ok(existsSync(new URL(p.replaceAll(' ', '%20'), base)), p);
+      }
     }
   }
 });
@@ -123,7 +125,7 @@ function screenshotApi(existing) {
       return { data: [{ id: 'SET67', attributes: { screenshotDisplayType: 'APP_IPHONE_67' } }] };
     }
     if (path === '/v1/appScreenshotSets/SET67/appScreenshots') {
-      return { data: existing.map((md5, i) => ({ id: `OLD${i}`, attributes: { sourceFileChecksum: md5 } })) };
+      return { data: existing.map((md5, i) => ({ id: `OLD${i}`, attributes: { sourceFileChecksum: md5, fileName: `old${i}.png` } })) };
     }
     if (method === 'POST' && path === '/v1/appScreenshots') {
       return { data: { id: `NEW${next++}`, attributes: { uploadOperations: [{ method: 'PUT', url: 'https://upload.invalid', offset: 0, length: body.data.attributes.fileSize, requestHeaders: [] }] } } };
@@ -211,5 +213,21 @@ test('snapshot reads current values in metadata.yaml shape without writing', asy
   assert.equal(snap.localizations.ja.supportUrl, 'https://enludus.vercel.app');
   assert.deepEqual(snap.localizations.ja.screenshots, { APP_IPHONE_67: ['1.png'] });
   assert.equal(snap.appInfo.ja.name, 'Preplay');
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+test('screenshots: keep entries reorder without uploading or deleting', async () => {
+  const { api, calls } = screenshotApi(['m0', 'm1', 'm2']);
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { screenshots: { APP_IPHONE_67: [{ keep: 'old0.png' }, { keep: 'old2.png' }, { keep: 'old1.png' }] } } } };
+  await sync(api, meta, { apply: true, log: () => {}, upload: async () => assert.fail('must not upload') });
+  assert.ok(!calls.some((c) => c.method === 'DELETE' || (c.method === 'POST' && c.path === '/v1/appScreenshots')));
+  const order = calls.find((c) => c.path === '/v1/appScreenshotSets/SET67/relationships/appScreenshots');
+  assert.deepEqual(order.body.data.map((d) => d.id), ['OLD0', 'OLD2', 'OLD1']);
+});
+
+test('screenshots: keep of an unknown file fails before writing', async () => {
+  const { api, calls } = screenshotApi(['m0']);
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { screenshots: { APP_IPHONE_67: [{ keep: 'nope.png' }] } } } };
+  await assert.rejects(sync(api, meta, { apply: true, log: () => {} }), /not in App Store Connect/);
   assert.ok(calls.every((c) => c.method === 'GET'));
 });
