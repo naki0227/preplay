@@ -26,8 +26,14 @@ function fakeApi({ versionExists, appInfoState = 'PREPARE_FOR_SUBMISSION' }) {
   const api = async (method, path, body) => {
     calls.push({ method, path, body });
     if (path.startsWith('/v1/apps?')) return { data: [{ id: 'APP' }] };
+    if (path === '/v1/apps/APP/appStoreVersions?filter[platform]=IOS') {
+      return { data: [{ id: 'LIVEVER', attributes: { versionString: '1.0', appStoreState: 'READY_FOR_SALE' } }] };
+    }
     if (path.startsWith('/v1/apps/APP/appStoreVersions')) {
       return { data: versionExists ? [{ id: 'VER', attributes: { versionString: '2.0.1', appStoreState: 'PREPARE_FOR_SUBMISSION' } }] : [] };
+    }
+    if (path === '/v1/appStoreVersions/LIVEVER/appStoreVersionLocalizations') {
+      return { data: [{ id: 'LIVELOC', attributes: { locale: 'ja', description: 'live', supportUrl: 'https://enludus.vercel.app', whatsNew: 'old notes' } }] };
     }
     if (path === '/v1/appStoreVersions' && method === 'POST') return { data: { id: 'VER', attributes: {} } };
     if (path === '/v1/appStoreVersions/VER/appStoreVersionLocalizations') {
@@ -167,4 +173,15 @@ test('screenshots: dry run does not upload', async () => {
   const pending = await sync(api, meta, { apply: false, baseDir: img.dir, log: () => {} });
   assert.equal(pending, 1);
   assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+test('dry run of a new version diffs against the live version', async () => {
+  const { api, calls } = fakeApi({ versionExists: false });
+  const lines = [];
+  await sync(api, meta, { apply: false, log: (l) => lines.push(l) });
+  assert.ok(calls.every((c) => c.method === 'GET'));
+  const out = lines.join('\n');
+  assert.match(out, /comparing with live version 1\.0/);
+  assert.match(out, /supportUrl: "https:\/\/enludus\.vercel\.app" -> "https:\/\/enludus\.com"/);
+  assert.match(out, /whatsNew: null ->/);
 });

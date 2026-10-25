@@ -57,17 +57,17 @@ export function diff(current, wanted) {
   return changes;
 }
 
-function printChanges(label, current, changes) {
+function printChanges(label, current, changes, log = console.log) {
   const keys = Object.keys(changes);
   if (keys.length === 0) {
-    console.log(`= ${label}: no changes`);
+    log(`= ${label}: no changes`);
     return;
   }
-  console.log(`~ ${label}:`);
+  log(`~ ${label}:`);
   for (const key of keys) {
     const before = JSON.stringify(current?.[key] ?? null);
     const after = JSON.stringify(changes[key]);
-    console.log(`    ${key}: ${before} -> ${after}`);
+    log(`    ${key}: ${before} -> ${after}`);
   }
 }
 
@@ -110,7 +110,7 @@ export async function sync(api, meta, opts = {}) {
         throw new Error(`appInfo locale "${locale}" not found (available: ${have})`);
       }
       const changes = diff(loc.attributes, wanted);
-      printChanges(`appInfo[${locale}]`, loc.attributes, changes);
+      printChanges(`appInfo[${locale}]`, loc.attributes, changes, log);
       if (Object.keys(changes).length) {
         pending++;
         if (apply) {
@@ -140,7 +140,29 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
   if (!version) {
     log(`+ appStoreVersion ${versionString}: will be created`);
     pending++;
-    if (!apply) return pending; // localizations do not exist yet; nothing more to diff
+    if (!apply) {
+      // A new version starts with a copy of the live version's text, so the
+      // dry run compares against that to show what will actually change.
+      const all = await api('GET', `/v1/apps/${app.id}/appStoreVersions?filter[platform]=IOS`);
+      const live = all.data.find((v) => ['READY_FOR_SALE', 'READY_FOR_DISTRIBUTION'].includes(v.attributes.appStoreState ?? v.attributes.appVersionState));
+      if (!live) return pending;
+      log(`  (comparing with live version ${live.attributes.versionString})`);
+      const liveLocs = await api('GET', `/v1/appStoreVersions/${live.id}/appStoreVersionLocalizations`);
+      for (const [locale, entry] of Object.entries(meta.localizations || {})) {
+        const { screenshots, ...wanted } = entry || {};
+        const loc = liveLocs.data.find((l) => l.attributes.locale === locale);
+        if (!loc) {
+          log(`+ localization[${locale}]: will be created`);
+          continue;
+        }
+        // whatsNew is not copied to a new version, so compare it with empty.
+        const base = { ...loc.attributes, whatsNew: null };
+        const changes = diff(base, wanted);
+        printChanges(`localization[${locale}]`, base, changes, log);
+        if (screenshots) pending += await syncScreenshots(api, loc.id, locale, screenshots, opts);
+      }
+      return pending;
+    }
     const created = await api('POST', '/v1/appStoreVersions', {
       data: {
         type: 'appStoreVersions',
@@ -155,7 +177,7 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
       throw new Error(`Version ${versionString} is ${state} and cannot be edited. Bump version.versionString.`);
     }
     const changes = diff(version.attributes, versionAttrs);
-    printChanges(`appStoreVersion ${versionString}`, version.attributes, changes);
+    printChanges(`appStoreVersion ${versionString}`, version.attributes, changes, log);
     if (Object.keys(changes).length) {
       pending++;
       if (apply) {
@@ -185,7 +207,7 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
       loc = created.data;
     } else {
       const changes = diff(loc.attributes, wanted);
-      printChanges(`localization[${locale}]`, loc.attributes, changes);
+      printChanges(`localization[${locale}]`, loc.attributes, changes, log);
       if (Object.keys(changes).length) {
         pending++;
         if (apply) {
