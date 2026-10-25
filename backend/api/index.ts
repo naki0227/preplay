@@ -23,6 +23,19 @@ function clientIp(header: string | undefined): string {
   return header?.split(',')[0]?.trim() || '127.0.0.1';
 }
 
+// The app only ever sends these situation tags (lib/services/situation_service.dart).
+// Anything else is rejected so the endpoint cannot be used as a free
+// general-purpose prompt proxy: user input never reaches the prompt as text.
+const ALLOWED_TAGS = new Set(['all', 'active', 'noisy', 'quiet', 'standing', 'waiting', 'walking']);
+
+export function parseRequest(body: any): { tags: string[]; groupSize: number } | null {
+  const { tags, groupSize = 2 } = body ?? {};
+  if (!Array.isArray(tags) || tags.length === 0 || tags.length > ALLOWED_TAGS.size) return null;
+  if (!tags.every((t) => typeof t === 'string' && ALLOWED_TAGS.has(t))) return null;
+  if (!Number.isInteger(groupSize) || groupSize < 1 || groupSize > 20) return null;
+  return { tags: [...new Set<string>(tags)], groupSize };
+}
+
 // gemini-1.5-flash was retired, which broke generation. Keep the model
 // configurable so the next retirement only needs an env change.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
@@ -79,8 +92,11 @@ app.post('/generate', async (c) => {
   }
 
   try {
-    const body = await c.req.json();
-    const { tags, groupSize } = body;
+    const parsed = parseRequest(await c.req.json().catch(() => null));
+    if (!parsed) {
+      return c.json({ error: 'Invalid request' }, 400);
+    }
+    const { tags, groupSize } = parsed;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -88,8 +104,8 @@ app.post('/generate', async (c) => {
     }
 
     const prompt = `
-    Create a detailed Japanese party game idea based on these contexts: ${tags?.join(', ')}.
-    Group size: ${groupSize || 'any'}.
+    Create a detailed Japanese party game idea based on these contexts: ${tags.join(', ')}.
+    Group size: ${groupSize}.
     
     Format the response exactly like this, in plain text without Markdown:
     ゲーム名: [Name]
