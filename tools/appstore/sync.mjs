@@ -159,6 +159,7 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
         const base = { ...loc.attributes, whatsNew: null };
         const changes = diff(base, wanted);
         printChanges(`localization[${locale}]`, base, changes, log);
+        if (Object.keys(changes).length) pending++;
         if (screenshots) pending += await syncScreenshots(api, loc.id, locale, screenshots, opts);
       }
       return pending;
