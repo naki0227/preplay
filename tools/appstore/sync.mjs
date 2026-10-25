@@ -147,6 +147,8 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
       const live = all.data.find((v) => ['READY_FOR_SALE', 'READY_FOR_DISTRIBUTION'].includes(v.attributes.appStoreState ?? v.attributes.appVersionState));
       if (!live) return pending;
       log(`  (comparing with live version ${live.attributes.versionString})`);
+      const vChanges = diff(live.attributes, versionAttrs);
+      printChanges(`appStoreVersion ${versionString}`, live.attributes, vChanges, log);
       const liveLocs = await api('GET', `/v1/appStoreVersions/${live.id}/appStoreVersionLocalizations`);
       for (const [locale, entry] of Object.entries(meta.localizations || {})) {
         const { screenshots, ...wanted } = entry || {};

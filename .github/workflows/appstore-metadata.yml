@@ -7,10 +7,10 @@ name: App Store metadata
 # Never submits for review.
 on:
   pull_request:
-    paths: ['appstore/**', 'tools/appstore/**']
+    paths: ['appstore/**', 'tools/appstore/**', 'assets/screenshot/**']
   push:
     branches: [main]
-    paths: ['appstore/**', 'tools/appstore/**']
+    paths: ['appstore/**', 'tools/appstore/**', 'assets/screenshot/**']
   workflow_dispatch:
     inputs:
       apply:

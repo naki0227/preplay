@@ -54,7 +54,20 @@ function fakeApi({ versionExists, appInfoState = 'PREPARE_FOR_SUBMISSION' }) {
   return { api, calls };
 }
 
-const meta = parse(readFileSync(new URL('../../../appstore/metadata.yaml', import.meta.url), 'utf8'));
+const fullMeta = parse(readFileSync(new URL('../../../appstore/metadata.yaml', import.meta.url), 'utf8'));
+// Text-only copy for the API flow tests; screenshots have their own tests.
+const meta = structuredClone(fullMeta);
+for (const loc of Object.values(meta.localizations || {})) delete loc.screenshots;
+
+test('screenshot files listed in metadata.yaml exist', async () => {
+  const { existsSync } = await import('node:fs');
+  const base = new URL('../../../appstore/', import.meta.url);
+  for (const loc of Object.values(fullMeta.localizations || {})) {
+    for (const paths of Object.values(loc.screenshots || {})) {
+      for (const p of paths) assert.ok(existsSync(new URL(p.replaceAll(' ', '%20'), base)), p);
+    }
+  }
+});
 
 test('dry run never writes', async () => {
   const { api, calls } = fakeApi({ versionExists: true });

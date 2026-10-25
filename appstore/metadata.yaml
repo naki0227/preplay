@@ -13,6 +13,7 @@ bundleId: com.preplay.preplay
 # if it does not exist yet. Keep in sync with pubspec.yaml.
 version:
   versionString: "2.0.1"
+  copyright: "2026 Enludus"
 
 # App information (applies to all versions)
 appInfo:
@@ -38,11 +39,19 @@ localizations:
     #     - screenshots/ja/iphone67/1.png
     #     - screenshots/ja/iphone67/2.png
     # max 100 chars; words already in the name/subtitle are not repeated
-    keywords: 暇つぶし,パーティー,ワードウルフ,人狼,しりとり,ウミガメのスープ,山手線ゲーム,心理ゲーム,飲み会,待ち時間,ドライブ,旅行,友達,お題,話題,雑談,盛り上げ,AI
+    keywords: 暇つぶし,パーティー,ワードウルフ,人狼,しりとり,ウミガメのスープ,山手線ゲーム,心理ゲーム,飲み会,待ち時間,ドライブ,旅行,友達,お題,話題,雑談,盛り上げ,AI,会話,オフライン
     # max 170 chars; can be changed later without a new review
     promotionalText: ワードウルフ、ウミガメのスープ、山手線ゲームなど42種類。道具も準備もいらない「その場で遊べるゲーム」を、ボタンひとつで提案します。
     supportUrl: https://enludus.com
     marketingUrl: https://enludus.com
+    # iPhone screenshots in the order they were taken. iPad ones are not
+    # listed, so they stay as they are.
+    screenshots:
+      APP_IPHONE_65:
+        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.00.59.png
+        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.10.png
+        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.25.png
+        - ../assets/screenshot/Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.28.png
     whatsNew: |-
       いくつかの不具合を修正しました。
 
