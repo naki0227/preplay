@@ -25,7 +25,7 @@ jobs:
     # Fork PRs cannot push back; skip them.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-26
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,43 +38,40 @@ jobs:
 
       - run: flutter pub get
 
-      # First boot of a simulator can take minutes (data migration); boot both
-      # up front so the app launch does not race it.
-      - name: Boot simulators
-        run: |
-          set -euo pipefail
-          IPHONE=$(python3 tool/pick_simulator.py "Pro Max")
-          IPAD=$(python3 tool/pick_simulator.py "iPad Pro 13-inch")
-          echo "IPHONE=$IPHONE" >> "$GITHUB_ENV"
-          echo "IPAD=$IPAD" >> "$GITHUB_ENV"
-          xcrun simctl boot "$IPHONE" || true
-          xcrun simctl boot "$IPAD" || true
-          xcrun simctl bootstatus "$IPHONE" -b > /dev/null
-          xcrun simctl bootstatus "$IPAD" -b > /dev/null
-
+      # One simulator at a time: two booted simulators overload the runner and
+      # the app launch hangs. Each try is time-limited, retried up to 3 times,
+      # and logs are kept for diagnosis.
       - name: Take screenshots
         run: |
           set -euo pipefail
+          mkdir -p build/sim-logs
           drive() {
-            # A stuck simulator launch must not burn the whole job: 20 min per try.
-            SCREENSHOT_DIR="$2" perl -e 'alarm shift; exec @ARGV' 1200 \
-              flutter drive \
+            local udid="$1" out="$2" try="$3"
+            SCREENSHOT_DIR="$out" perl -e 'alarm shift; exec @ARGV' 900 \
+              flutter drive -v \
                 --driver=test_driver/integration_test.dart \
                 --target=integration_test/screenshots_test.dart \
                 --dart-define-from-file=config/app_config.json \
-                -d "$1"
+                -d "$udid" > "build/sim-logs/drive-$udid-$try.log" 2>&1
           }
           shoot() {
-            local udid="$1" out="$2" w="$3" h="$4"
-            rm -rf "$out"
-            if ! drive "$udid" "$out"; then
-              echo "::warning::flutter drive failed on $udid; restarting the simulator and retrying once"
-              xcrun simctl shutdown "$udid" || true
+            local match="$1" out="$2" w="$3" h="$4"
+            local udid
+            udid=$(python3 tool/pick_simulator.py "$match")
+            local ok=false
+            for try in 1 2 3; do
+              xcrun simctl shutdown all || true
               xcrun simctl boot "$udid"
               xcrun simctl bootstatus "$udid" -b > /dev/null
               rm -rf "$out"
-              drive "$udid" "$out"
-            fi
+              if drive "$udid" "$out" "$try"; then ok=true; break; fi
+              echo "::warning::flutter drive on $match failed (try $try); see the sim-logs artifact"
+              tail -n 40 "build/sim-logs/drive-$udid-$try.log" || true
+              xcrun simctl spawn "$udid" log show --last 10m --style compact \
+                --predicate 'process == "Runner"' > "build/sim-logs/device-$udid-$try.log" 2>&1 || true
+            done
+            $ok || { echo "::error::flutter drive on $match failed 3 times"; exit 1; }
+            grep -E "All tests passed|^flutter:" "build/sim-logs/drive-$udid-$try.log" | tail -n 5 || true
             # App Store accepts only exact sizes; fail loudly if the device changed.
             for f in "$out"/*.png; do
               size=$(sips -g pixelWidth -g pixelHeight "$f" | awk '/pixel/{print $2}' | paste -sd x -)
@@ -82,8 +79,15 @@ jobs:
               [ "$size" = "${w}x${h}" ] || { echo "::error::$f is $size, expected ${w}x${h}"; exit 1; }
             done
           }
-          shoot "$IPHONE" appstore/screenshots/ja/iphone69 1320 2868
-          shoot "$IPAD" appstore/screenshots/ja/ipad13 2064 2752
+          shoot "Pro Max" appstore/screenshots/ja/iphone69 1320 2868
+          shoot "iPad Pro 13-inch" appstore/screenshots/ja/ipad13 2064 2752
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sim-logs
+          path: build/sim-logs
+          retention-days: 7
 
       - uses: actions/upload-artifact@v4
         with:
