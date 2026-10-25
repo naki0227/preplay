@@ -22,7 +22,7 @@ Preplayは、待ち時間や隙間時間に「何して遊ぶ？」と迷うス�
 *   **State Management**: Provider (`PreplayController`)
 *   **Persistence**: shared_preferences
 *   **UI Components**: Cupertino (iOS-style), AnimatedSwitcher
-*   **Font**: google_fonts (`M PLUS Rounded 1c`)
+*   **Font**: M PLUS Rounded 1c（`assets/fonts`、SIL OFL 1.1。アプリに同梱）
 *   **Target**: macOS (Desktop), iOS
 
 ## 📂 Project Structure
