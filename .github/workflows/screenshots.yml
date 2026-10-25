@@ -25,7 +25,7 @@ jobs:
     # Fork PRs cannot push back; skip them.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,22 +38,43 @@ jobs:
 
       - run: flutter pub get
 
+      # First boot of a simulator can take minutes (data migration); boot both
+      # up front so the app launch does not race it.
+      - name: Boot simulators
+        run: |
+          set -euo pipefail
+          IPHONE=$(python3 tool/pick_simulator.py "Pro Max")
+          IPAD=$(python3 tool/pick_simulator.py "iPad Pro 13-inch")
+          echo "IPHONE=$IPHONE" >> "$GITHUB_ENV"
+          echo "IPAD=$IPAD" >> "$GITHUB_ENV"
+          xcrun simctl boot "$IPHONE" || true
+          xcrun simctl boot "$IPAD" || true
+          xcrun simctl bootstatus "$IPHONE" -b > /dev/null
+          xcrun simctl bootstatus "$IPAD" -b > /dev/null
+
       - name: Take screenshots
         run: |
           set -euo pipefail
+          drive() {
+            # A stuck simulator launch must not burn the whole job: 20 min per try.
+            SCREENSHOT_DIR="$2" perl -e 'alarm shift; exec @ARGV' 1200 \
+              flutter drive \
+                --driver=test_driver/integration_test.dart \
+                --target=integration_test/screenshots_test.dart \
+                --dart-define-from-file=config/app_config.json \
+                -d "$1"
+          }
           shoot() {
-            local match="$1" out="$2" w="$3" h="$4"
-            local udid
-            udid=$(python3 tool/pick_simulator.py "$match")
-            xcrun simctl boot "$udid" || true
-            xcrun simctl bootstatus "$udid" -b
+            local udid="$1" out="$2" w="$3" h="$4"
             rm -rf "$out"
-            SCREENSHOT_DIR="$out" flutter drive \
-              --driver=test_driver/integration_test.dart \
-              --target=integration_test/screenshots_test.dart \
-              --dart-define-from-file=config/app_config.json \
-              -d "$udid"
-            xcrun simctl shutdown "$udid" || true
+            if ! drive "$udid" "$out"; then
+              echo "::warning::flutter drive failed on $udid; restarting the simulator and retrying once"
+              xcrun simctl shutdown "$udid" || true
+              xcrun simctl boot "$udid"
+              xcrun simctl bootstatus "$udid" -b > /dev/null
+              rm -rf "$out"
+              drive "$udid" "$out"
+            fi
             # App Store accepts only exact sizes; fail loudly if the device changed.
             for f in "$out"/*.png; do
               size=$(sips -g pixelWidth -g pixelHeight "$f" | awk '/pixel/{print $2}' | paste -sd x -)
@@ -61,8 +82,8 @@ jobs:
               [ "$size" = "${w}x${h}" ] || { echo "::error::$f is $size, expected ${w}x${h}"; exit 1; }
             done
           }
-          shoot "Pro Max" appstore/screenshots/ja/iphone69 1320 2868
-          shoot "iPad Pro 13-inch" appstore/screenshots/ja/ipad13 2064 2752
+          shoot "$IPHONE" appstore/screenshots/ja/iphone69 1320 2868
+          shoot "$IPAD" appstore/screenshots/ja/ipad13 2064 2752
 
       - uses: actions/upload-artifact@v4
         with:
