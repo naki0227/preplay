@@ -22,7 +22,7 @@ Preplayは、待ち時間や隙間時間に「何して遊ぶ？」と迷うス�
 *   **State Management**: Provider (`PreplayController`)
 *   **Persistence**: shared_preferences
 *   **UI Components**: Cupertino (iOS-style), AnimatedSwitcher
-*   **Font**: google_fonts (`M PLUS Rounded 1c`)
+*   **Font**: M PLUS Rounded 1c（`assets/fonts`、SIL OFL 1.1。アプリに同梱）
 *   **Target**: macOS (Desktop), iOS
 
 ## 📂 Project Structure
@@ -38,6 +38,27 @@ lib/
     ├── home_screen.dart # Main orchestrator
     └── widgets/         # DetectiveView, SuggestionView, etc.
 ```
+
+## 🔧 Build
+
+APIキーはアプリに入れません。Gemini のキーはバックエンド（`backend/`、Vercel）の環境変数だけに置きます。
+アプリに渡すのは公開してよい値だけです。値は `config/app_config.json` に書いてあり（Git 管理）、`--dart-define-from-file` で渡します。
+**このファイルに秘密の値（Gemini キー、Supabase の service_role / secret key、DB パスワード）を書かないこと。**
+
+```bash
+flutter pub get
+flutter test
+flutter build ipa --dart-define-from-file=config/app_config.json
+```
+
+| キー | 内容 |
+|---|---|
+| `BACKEND_URL` | バックエンドのURL（省略時 `https://preplay-five.vercel.app`） |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | 「みんなの遊び」用。anon / publishable key は公開前提の値（RLSで保護） |
+
+リリース（CI でのビルドと App Store Connect へのアップロード、ストア情報・スクリーンショット・Supabase の自動更新）: [docs/RELEASE.md](docs/RELEASE.md)
+
+障害の調査結果と復旧手順: [docs/MAINTENANCE_2026-10.md](docs/MAINTENANCE_2026-10.md)
 
 ## 🚀 Future Roadmap (V2.0)
 

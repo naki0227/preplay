@@ -37,29 +37,43 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           
-          // About Button
-          Positioned(
-            top: 60,
-            right: 24,
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context, 
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => const AboutSheet(),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.white.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(CupertinoIcons.info, color: AppColors.textMain, size: 24),
-              ),
-            ),
+          // About Button (same position and look as the library button;
+          // hidden while playing, where the header has its own controls)
+          Consumer<PreplayController>(
+            builder: (context, controller, _) => controller.state == PreplayState.playing
+                ? const SizedBox.shrink()
+                : Positioned(
+                    top: 24,
+                    right: 24,
+                    child: SafeArea(
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => const AboutSheet(),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemBackground.resolveFrom(context).withOpacity(0.8),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: CupertinoColors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(CupertinoIcons.info, color: AppColors.textMain, size: 24, semanticLabel: 'Preplayについて'),
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -71,7 +85,7 @@ class HomeScreen extends StatelessWidget {
       case PreplayState.detecting:
         return const DetectingView();
       case PreplayState.thinking:
-        return const DetectingView(message: 'AIが新しい遊びを生成中...\n(10秒ほどかかります)');
+        return const DetectingView(message: 'AIが新しい遊びを考えています...\n(数秒かかります)');
       case PreplayState.suggested:
         if (controller.currentGame != null) {
           return GameSuggestionView(game: controller.currentGame!, key: ValueKey(controller.currentGame!.id));

@@ -1,6 +1,6 @@
 # プライバシーポリシー / Privacy Policy
 
-**最終更新日 / Last Updated: 2026-02-07**
+**最終更新日 / Last Updated: 2026-10-20**
 
 ---
 
@@ -10,6 +10,8 @@
 Preplay（以下「本アプリ」）は、ユーザーのプライバシーを尊重し、個人情報の保護に努めています。本プライバシーポリシーでは、本アプリがどのような情報を収集し、どのように使用するかについて説明します。
 
 ### 2. 収集する情報
+
+位置情報・モーション・音声レベルは、アプリ内の「その場に合わせる」をオンにしたときだけ使います（初期状態はオフ）。
 
 #### 2.1 位置情報（任意）
 - **目的**: 移動速度を検知し、状況に合った遊びを提案するため
@@ -30,6 +32,12 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 - **目的**: 「みんなの遊び」機能でゲームを共有するため
 - **収集方法**: ユーザーが自発的に投稿
 - **保存**: Supabase（クラウドデータベース）に保存
+- **通報**: 不適切な投稿を通報すると、対象の遊びの ID と日時だけを保存します（通報した人の情報は保存しません）
+
+#### 2.5 AIによる遊びの生成
+- **目的**: 「AIで生成」を使ったときに、状況に合った遊びを作るため
+- **送信する情報**: 状況タグ（例:「静か」「歩いている」）と人数のみ。位置情報・音声そのものは送信しません
+- **送信先**: 本アプリのサーバーを経由して Google Gemini API に送信されます
 
 ### 3. 情報の第三者提供
 本アプリは、法令に基づく場合を除き、ユーザーの個人情報を第三者に提供しません。
@@ -39,7 +47,7 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 
 ### 5. お問い合わせ
 プライバシーに関するご質問は、以下までご連絡ください：
-- GitHub: https://github.com/naki0227/preplay/issues
+- メール: contact@enludus.com
 
 ---
 
@@ -49,6 +57,8 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 Preplay ("the App") respects user privacy and is committed to protecting personal information. This Privacy Policy explains what information we collect and how we use it.
 
 ### 2. Information We Collect
+
+Location, motion and audio level are used only when "その場に合わせる" (match the situation) is turned on in the App. It is off by default.
 
 #### 2.1 Location Data (Optional)
 - **Purpose**: To detect movement speed and suggest appropriate games
@@ -69,6 +79,12 @@ Preplay ("the App") respects user privacy and is committed to protecting persona
 - **Purpose**: To share games via the "Community Games" feature
 - **Method**: Voluntarily submitted by users
 - **Storage**: Stored in Supabase (cloud database)
+- **Reports**: When you report a post, only the game's ID and the time are stored (nothing about the reporter)
+
+#### 2.5 AI Game Generation
+- **Purpose**: To generate a game when you use the AI generation feature
+- **Data sent**: Context tags only (e.g. "quiet", "walking") and group size. Raw location and audio are never sent
+- **Recipient**: Sent via the App's server to the Google Gemini API
 
 ### 3. Third-Party Sharing
 We do not share personal information with third parties except as required by law.
@@ -78,7 +94,7 @@ Collected data is protected using industry-standard encryption.
 
 ### 5. Contact
 For privacy-related inquiries, please contact us at:
-- GitHub: https://github.com/naki0227/preplay/issues
+- Email: contact@enludus.com
 
 ---
 

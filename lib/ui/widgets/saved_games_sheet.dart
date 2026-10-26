@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../config/app_config.dart';
 import '../../models/game_model.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_colors.dart';
+import 'all_games_list.dart';
 
 class SavedGamesSheet extends StatefulWidget {
   const SavedGamesSheet({super.key});
@@ -50,14 +52,15 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
               child: CupertinoSlidingSegmentedControl<int>(
                 groupValue: _groupValue,
                 children: const {
-                  0: Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('お気に入り')),
-                  1: Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('みんなの遊び')),
+                  0: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('お気に入り')),
+                  1: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('すべて')),
+                  2: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('みんなの遊び')),
                 },
                 onValueChanged: (value) {
                   setState(() {
                     _groupValue = value ?? 0;
                   });
-                  if (_groupValue == 1 && communityGames.isEmpty && !isLoading && communityError == null) {
+                  if (_groupValue == 2 && communityGames.isEmpty && !isLoading && communityError == null) {
                     controller.loadCommunityGames();
                   }
                 },
@@ -66,9 +69,11 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
           ),
 
           Expanded(
-            child: _groupValue == 0
-                ? _buildSavedList(context, controller, savedGames)
-                : _buildCommunityList(context, controller, communityGames, isLoading, communityError),
+            child: switch (_groupValue) {
+              0 => _buildSavedList(context, controller, savedGames),
+              1 => const AllGamesList(),
+              _ => _buildCommunityList(context, controller, communityGames, isLoading, communityError),
+            },
           ),
         ],
       ),
@@ -110,11 +115,11 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
                 // OS Share Button (Viral)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.share, size: 24),
+                  child: const Icon(CupertinoIcons.share, size: 24, semanticLabel: '友達に送る'),
                   onPressed: () {
                     // Start OS Sharing
                     Share.share(
-                      'この遊び知ってる？「${game.title}」\n\nルール: ${game.rules}\n\n#Preplay #暇つぶし\n\n📱 ダウンロードはこちら:\nhttps://example.com/preplay (仮)',
+                      'この遊び知ってる？「${game.title}」\n\nルール: ${game.rules}\n\n#Preplay #暇つぶし\n\n📱 ダウンロードはこちら:\n${AppConfig.appStoreUrl}',
                       subject: game.title,
                     );
                   },
@@ -124,14 +129,14 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
                 // Community Upload Button (Cloud)
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.cloud_upload, size: 24),
+                  child: const Icon(CupertinoIcons.cloud_upload, size: 24, semanticLabel: 'みんなの遊びに公開'),
                   onPressed: () => _confirmShare(context, controller, game),
                 ),
                 const SizedBox(width: 8),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: () => controller.toggleSave(game),
-                  child: const Icon(CupertinoIcons.heart_fill, color: CupertinoColors.systemPink),
+                  child: const Icon(CupertinoIcons.heart_fill, color: CupertinoColors.systemPink, semanticLabel: 'お気に入りから外す'),
                 ),
               ],
             ),
@@ -207,17 +212,84 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
             },
             title: Text(game.title, style: const TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(game.rules.replaceAll('\n', ' '), maxLines: 1, overflow: TextOverflow.ellipsis),
-            trailing: CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () => controller.toggleSave(game),
-              child: Icon(
-                isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
-              ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => controller.toggleSave(game),
+                  child: Icon(
+                    isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                    color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
+                    semanticLabel: isSaved ? 'お気に入りから外す' : 'お気に入りに追加',
+                  ),
+                ),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showCommunityActions(context, controller, game),
+                  child: const Icon(CupertinoIcons.ellipsis, color: CupertinoColors.systemGrey, semanticLabel: 'その他の操作'),
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showCommunityActions(BuildContext context, PreplayController controller, GameModel game) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: Text(game.title),
+        actions: [
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _confirmReport(context, controller, game);
+            },
+            child: const Text('不適切な内容として通報'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('キャンセル'),
+        ),
+      ),
+    );
+  }
+
+  void _confirmReport(BuildContext context, PreplayController controller, GameModel game) {
+    showCupertinoDialog(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('通報しますか？'),
+        content: const Text('この遊びはあなたの画面に表示されなくなります。通報が集まった遊びは、みんなの画面からも消えます。'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('キャンセル'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('通報する'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await controller.reportGame(game);
+              if (!context.mounted) return;
+              showCupertinoDialog(
+                context: context,
+                builder: (c) => CupertinoAlertDialog(
+                  title: const Text('通報しました'),
+                  content: const Text('ご協力ありがとうございます。内容を確認して対応します。\nお問い合わせ: contact@enludus.com'),
+                  actions: [CupertinoDialogAction(child: const Text('OK'), onPressed: () => Navigator.pop(c))],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 

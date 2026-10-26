@@ -1,0 +1,66 @@
+# リリースの手順（CI / CD）
+
+| ワークフロー | いつ動くか | やること |
+|---|---|---|
+| `CI`（`.github/workflows/ci.yml`） | PR と main への push | アプリの analyze・test、バックエンドの typecheck・test、ストア同期ツールの test |
+| `iOS release`（`ios-release.yml`） | **手動のみ** | IPA をビルドする。「upload」にチェックを入れると、App Store Connect（TestFlight）へアップロードする |
+| `Supabase`（`supabase.yml`） | `supabase/` を変える PR と、main への push、手動 | マイグレーションと公式の遊びの投入。PR では使い捨ての Postgres でテストし、本番 DB は dry run。main に入ると本番 DB に当てる |
+| `App Store screenshots`（`screenshots.yml`） | `integration_test/` などを変える PR と、手動 | iPhone 6.9 インチと iPad 13 インチのシミュレーターでアプリを動かしてスクリーンショットを撮り、`appstore/screenshots/` にコミットする |
+| `App Store metadata`（`appstore-metadata.yml`） | `appstore/` を変える PR と、main への push、手動 | `appstore/metadata.yaml` の内容を App Store Connect に反映する。PR では差分を表示するだけ（dry run）。main に入ると反映する |
+
+**審査への提出は自動化していません。** 最後は App Store Connect の画面で「審査へ提出」を押します。
+
+## 最初に一度だけやること
+
+### 1. App Store Connect の API キーを作る
+
+1. https://appstoreconnect.apple.com/access/integrations/api を開く
+2. 「Team Keys」でキーを作る。アクセス権は **Admin** にする
+   - ビルドの署名（証明書とプロファイルを自動で作る）に Admin が要ります。ストア情報の更新だけなら App Manager で足ります
+3. 次の 3 つを控える
+   - **Key ID**
+   - **Issuer ID**（キー一覧の上に表示されます）
+   - **.p8 ファイル**（ダウンロードは 1 回しかできません）
+
+### 2. GitHub の Secrets に登録する
+
+https://github.com/naki0227/preplay/settings/secrets/actions を開き、**「Repository secrets」**の「New repository secret」で次の 3 つを登録する（Environment secrets や Variables ではない）。
+
+| 名前 | 値 |
+|---|---|
+| `ASC_KEY_ID` | Key ID |
+| `ASC_ISSUER_ID` | Issuer ID |
+| `ASC_KEY_P8` | .p8 ファイルの中身を全部（`-----BEGIN PRIVATE KEY-----` から `-----END PRIVATE KEY-----` まで） |
+| `SUPABASE_DB_URL` | Supabase の「Connect」→「Session pooler」の接続文字列（パスワード入り）。手順は `docs/MAINTENANCE_2026-10.md` の D |
+
+.p8 ファイルとその中身は、Git やチャットに貼らないでください。登録したら、手元の .p8 は安全な場所に保管するか削除します。
+
+## リリースの流れ
+
+1. `pubspec.yaml` の `version` と、`appstore/metadata.yaml` の `version.versionString` を上げる（テストで一致を確認しています）
+2. リリースノート（`whatsNew`）など、ストアの文面を `appstore/metadata.yaml` で直す
+3. PR を作る → 「App Store metadata」のログで、何が変わるかを確認する。ログの最後には App Store Connect の今の値が YAML の形で出るので、変えたい項目をコピーして `metadata.yaml` に貼り、書き換えればよい
+4. main にマージする → ストアの情報が反映される。そのバージョンがまだなければ「提出準備中」で作られる
+5. Actions → 「iOS release」→ Run workflow
+   - まず「upload」のチェックなしで実行して、ビルドが通るか確かめる（IPA は Artifacts に 7 日残ります）
+   - 通ったら「upload」にチェックを入れて実行する。ビルド番号は実行した日時（UTC）から自動で決まります
+6. App Store Connect で、アップロードしたビルドをバージョンに選び、「審査へ提出」を押す
+
+## スクリーンショット
+
+- 撮る画面は `integration_test/screenshots_test.dart` に書いてある（提案、遊んでいるところ、すべての遊び、お気に入り、「その場に合わせる」の説明）
+- Actions →「App Store screenshots」→ Run workflow で撮り直せる。撮った画像は同じブランチにコミットされ、Artifacts にも残る
+- サイズが App Store の規定（iPhone 1320×2868、iPad 2064×2752）と違うと失敗する
+- ストアに反映するのは `appstore/metadata.yaml` の `screenshots`。画像を差し替えたら、その PR の「App Store metadata」の dry run で差分を確認する
+
+## 補足
+
+- **GitHub Actions の macOS ランナーは時間がかかります。** 1 回のビルドで 20〜30 分ほどです。プライベートリポジトリだと、無料枠を Linux の 10 倍の速さで使います。このリポジトリは公開なので、無料で使えます
+- `appstore/metadata.yaml` は**差分更新（パッチ）**です。書いた項目だけを変え、書いていない項目には触りません
+  - キーワードを変えたいとき: `localizations.ja.keywords` を書き足す
+  - スクリーンショットを変えたいとき: 画像を `appstore/screenshots/...` に置き、`localizations.ja.screenshots.<表示サイズ>` に並べる。並べたサイズだけが、その画像・その順番に置き換わります。同じ画像は再アップロードしません。サイズが合わないと Apple に拒否され、ワークフローが失敗して教えてくれます
+  - 並び順だけ変えたいとき: `- keep: <ファイル名>` と書くと、App Store Connect にある画像をそのまま使います（ファイル名は dry run のログ末尾に出ます）
+  - 書き方の例は `metadata.yaml` のコメントにあります
+  - `assets/screenshot/` の画像は 1179×2556（6.1 インチ）なので、今の App Store の必須サイズ（6.9 インチ: 1320×2868 か 1290×2796）には使えません
+- 価格・配信国・年齢制限・App のプライバシーの申告は、このツールでは扱いません
+- 公開中のバージョンの文面は Apple の仕様で編集できません。新しいバージョンを作ってから反映されます

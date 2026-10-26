@@ -19,7 +19,11 @@ class GameSuggestionView extends StatelessWidget {
               physics: const AlwaysScrollableScrollPhysics(),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(
+                child: Center(
+                  child: ConstrainedBox(
+                  // Keep the card readable on iPad.
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -30,6 +34,7 @@ class GameSuggestionView extends StatelessWidget {
                         clipBehavior: Clip.none,
                         children: [
                           Container(
+                            width: double.infinity, // same width as the buttons (iPad)
                             padding: const EdgeInsets.all(32.0),
                             decoration: BoxDecoration(
                               color: CupertinoColors.systemBackground.resolveFrom(context),
@@ -82,10 +87,6 @@ class GameSuggestionView extends StatelessWidget {
                             },
                             isPrimary: false,
                           ),
-                          CupertinoButton(
-                            child: const Text('閉じる', style: TextStyle(color: CupertinoColors.secondaryLabel)),
-                            onPressed: () => SystemNavigator.pop(),
-                          ),
                           // AI Generation Button
                           if (!game.id.startsWith('ai_'))
                             CupertinoButton(
@@ -111,11 +112,24 @@ class GameSuggestionView extends StatelessWidget {
                                 context.read<PreplayController>().generateWithAI();
                               },
                             ),
+                          if (context.watch<PreplayController>().aiError case final error?)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                error,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: CupertinoColors.systemRed.resolveFrom(context), fontSize: 12),
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          const _SensingToggle(),
                         ],
                       ),
                       const SizedBox(height: 24), // Bottom spacing
                     ],
                   ),
+                ),
+                ),
                 ),
               ),
             );
@@ -151,6 +165,7 @@ class GameSuggestionView extends StatelessWidget {
                   CupertinoIcons.square_favorites_alt,
                   color: CupertinoColors.label,
                   size: 24,
+                  semanticLabel: 'お気に入りと遊びの一覧',
                 ),
               ),
             ),
@@ -230,7 +245,78 @@ class _SaveButton extends StatelessWidget {
           isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
           color: isSaved ? CupertinoColors.systemPink : CupertinoColors.systemGrey,
           size: 24,
+          semanticLabel: isSaved ? 'お気に入りから外す' : 'お気に入りに追加',
         ),
+      ),
+    );
+  }
+}
+
+/// "その場に合わせる" switch. Explains what the sensors are used for before
+/// iOS asks for location / microphone permission.
+class _SensingToggle extends StatelessWidget {
+  const _SensingToggle();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<PreplayController>();
+    final on = controller.contextSensing;
+    return CupertinoButton(
+      minimumSize: Size.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      onPressed: () => on ? controller.setContextSensing(false) : _confirmEnable(context, controller),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            on ? CupertinoIcons.location_fill : CupertinoIcons.location,
+            size: 14,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            on ? 'その場に合わせる：オン' : 'その場に合わせる：オフ',
+            style: TextStyle(color: CupertinoColors.secondaryLabel.resolveFrom(context), fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmEnable(BuildContext context, PreplayController controller) {
+    showCupertinoDialog(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('その場に合った遊びを出す'),
+        content: const Text(
+          '周りの音の大きさ、動き、移動の速さから、今できる遊びを選びます。\n'
+          '使うのは端末の中だけで、録音や位置情報の送信はしません。\n\n'
+          'このあと、位置情報とマイクの許可を聞かれます。',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('今はしない'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('オンにする'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final enabled = await controller.setContextSensing(true);
+              if (!enabled && context.mounted) {
+                showCupertinoDialog(
+                  context: context,
+                  builder: (c) => CupertinoAlertDialog(
+                    title: const Text('許可がありません'),
+                    content: const Text('設定アプリの「Preplay」で、位置情報かマイクを許可するとオンにできます。'),
+                    actions: [CupertinoDialogAction(child: const Text('OK'), onPressed: () => Navigator.pop(c))],
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
     );
   }

@@ -1,0 +1,112 @@
+name: App Store screenshots
+
+# Takes the App Store screenshots on iPhone 6.9" and iPad 13" simulators
+# (integration_test/screenshots_test.dart) and commits them to
+# appstore/screenshots/ on the same branch when they changed.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'integration_test/**'
+      - 'test_driver/**'
+      - 'tool/pick_simulator.py'
+      - '.github/workflows/screenshots.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    # Fork PRs cannot push back; skip them.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-26
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - run: flutter pub get
+
+      # One simulator at a time: two booted simulators overload the runner and
+      # the app launch hangs. Each try is time-limited, retried up to 3 times,
+      # and logs are kept for diagnosis.
+      - name: Take screenshots
+        run: |
+          set -euo pipefail
+          mkdir -p build/sim-logs
+          drive() {
+            local udid="$1" out="$2" try="$3"
+            SCREENSHOT_DIR="$out" perl -e 'alarm shift; exec @ARGV' 900 \
+              flutter drive -v \
+                --driver=test_driver/integration_test.dart \
+                --target=integration_test/screenshots_test.dart \
+                --dart-define-from-file=config/app_config.json \
+                -d "$udid" > "build/sim-logs/drive-$udid-$try.log" 2>&1
+          }
+          shoot() {
+            local match="$1" out="$2" w="$3" h="$4"
+            local udid
+            udid=$(python3 tool/pick_simulator.py "$match")
+            local ok=false
+            for try in 1 2 3; do
+              xcrun simctl shutdown all || true
+              xcrun simctl boot "$udid"
+              xcrun simctl bootstatus "$udid" -b > /dev/null
+              rm -rf "$out"
+              if drive "$udid" "$out" "$try"; then ok=true; break; fi
+              echo "::warning::flutter drive on $match failed (try $try); see the sim-logs artifact"
+              tail -n 40 "build/sim-logs/drive-$udid-$try.log" || true
+              xcrun simctl spawn "$udid" log show --last 10m --style compact \
+                --predicate 'process == "Runner"' > "build/sim-logs/device-$udid-$try.log" 2>&1 || true
+            done
+            $ok || { echo "::error::flutter drive on $match failed 3 times"; exit 1; }
+            grep -E "All tests passed|^flutter:" "build/sim-logs/drive-$udid-$try.log" | tail -n 5 || true
+            # App Store accepts only exact sizes; fail loudly if the device changed.
+            for f in "$out"/*.png; do
+              size=$(sips -g pixelWidth -g pixelHeight "$f" | awk '/pixel/{print $2}' | paste -sd x -)
+              echo "$f: $size"
+              [ "$size" = "${w}x${h}" ] || { echo "::error::$f is $size, expected ${w}x${h}"; exit 1; }
+            done
+          }
+          shoot "Pro Max" appstore/screenshots/ja/iphone69 1320 2868
+          shoot "iPad Pro 13-inch" appstore/screenshots/ja/ipad13 2064 2752
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sim-logs
+          path: build/sim-logs
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appstore-screenshots
+          path: appstore/screenshots
+          retention-days: 14
+
+      - name: Commit screenshots
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          git add appstore/screenshots
+          if git diff --cached --quiet; then
+            echo "Screenshots unchanged."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Update App Store screenshots"
+          # The branch may have moved while the simulators ran.
+          # The build changes lockfiles etc.; only the screenshots are committed.
+          git pull --rebase --autostash origin "$BRANCH"
+          git push origin "HEAD:$BRANCH"

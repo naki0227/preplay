@@ -1,30 +1,42 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:preplay/main.dart';
+import 'package:preplay/config/app_config.dart';
+import 'package:preplay/models/game_model.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('backend URL points at the production backend by default', () {
+    expect(AppConfig.backendUrl, startsWith('https://'));
+    expect(AppConfig.backendUrl, isNot(contains('enludus.vercel.app')));
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  test('Supabase is enabled only when both values are passed at build time', () {
+    expect(
+      AppConfig.hasSupabase,
+      AppConfig.supabaseUrl.isNotEmpty && AppConfig.supabaseAnonKey.isNotEmpty,
+    );
+    if (AppConfig.hasSupabase) {
+      expect(AppConfig.supabaseUrl, startsWith('https://'));
+    }
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('share link is the App Store page, not a placeholder', () {
+    expect(AppConfig.appStoreUrl, startsWith('https://apps.apple.com/'));
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('bundled games have unique ids and non-empty rules', () {
+    final ids = GameModel.mvpGames.map((g) => g.id).toList();
+    expect(ids.toSet().length, ids.length);
+    for (final game in GameModel.mvpGames) {
+      expect(game.title, isNotEmpty);
+      expect(game.rules, isNotEmpty);
+      expect(game.tags, isNotEmpty);
+    }
+  });
+
+  test('GameModel survives a JSON round trip', () {
+    final game = GameModel.mvpGames.first;
+    final restored = GameModel.fromJson(game.toJson());
+    expect(restored.id, game.id);
+    expect(restored.topics, game.topics);
   });
 }

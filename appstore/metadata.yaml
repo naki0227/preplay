@@ -1,0 +1,112 @@
+# App Store Connect metadata managed in Git.
+# CD (.github/workflows/appstore-metadata.yml) applies this file:
+#   - pull request: dry run (shows what would change)
+#   - push to main: applies the changes
+# Patch semantics: only fields written here are touched. Anything not
+# written (keywords, screenshots, other locales...) stays as it is in
+# App Store Connect. Add a field only when you want to change it.
+# Submission for review is NOT automated; do that in App Store Connect.
+
+bundleId: com.preplay.preplay
+
+# The App Store version to edit. Created in "Prepare for Submission" state
+# if it does not exist yet. Keep in sync with pubspec.yaml.
+version:
+  versionString: "2.0.1"
+  copyright: "2026 Enludus"
+
+# App information (applies to all versions)
+appInfo:
+  ja:
+    subtitle: 道具なしで今すぐ遊べるゲーム集   # max 30 chars, searchable
+    privacyPolicyUrl: https://github.com/naki0227/preplay/blob/main/PRIVACY_POLICY.md
+
+# Version information, per locale
+localizations:
+  ja:
+    # Examples (uncomment to manage):
+    # keywords: 暇つぶし,遊び,パーティーゲーム,しりとり   # comma separated, max 100 chars
+    # promotionalText: ...                                # can change without a new review
+    #
+    # screenshots: one list per display type. Each entry is a path relative
+    # to this file (uploaded unless the same image is already there) or
+    # "keep: <file name>" to reuse an image already in App Store Connect.
+    # Only the display types listed are replaced (same images, same order);
+    # other display types are untouched.
+    #   APP_IPHONE_67: 6.9"/6.7" (1320x2868 or 1290x2796)  <- required for iPhone
+    #   APP_IPHONE_65: 6.5"      (1284x2778 or 1242x2688)
+    #   APP_IPAD_PRO_3GEN_129: 13"/12.9" iPad (2048x2732)
+    # screenshots:
+    #   APP_IPHONE_67:
+    #     - screenshots/ja/iphone67/1.png
+    #     - screenshots/ja/iphone67/2.png
+    # max 100 chars; words already in the name/subtitle are not repeated
+    keywords: 暇つぶし,パーティー,ワードウルフ,人狼,しりとり,ウミガメのスープ,山手線ゲーム,心理ゲーム,飲み会,待ち時間,ドライブ,旅行,友達,お題,話題,雑談,盛り上げ,AI,会話,オフライン
+    # max 170 chars; can be changed later without a new review
+    promotionalText: ワードウルフ、ウミガメのスープ、山手線ゲームなど42種類。道具も準備もいらない「その場で遊べるゲーム」を、ボタンひとつで提案します。
+    supportUrl: https://enludus.com
+    marketingUrl: https://enludus.com
+    # Taken by CI (.github/workflows/screenshots.yml) on iPhone 6.9" and iPad 13"
+    # simulators. App Store scales the 6.9" set for smaller iPhones, so the
+    # old 6.5" set is cleared.
+    screenshots:
+      APP_IPHONE_67:
+        - screenshots/ja/iphone69/1_suggestion.png
+        - screenshots/ja/iphone69/2_playing.png
+        - screenshots/ja/iphone69/3_all_games.png
+        - screenshots/ja/iphone69/4_favorites.png
+        - screenshots/ja/iphone69/5_context.png
+      APP_IPAD_PRO_3GEN_129:
+        - screenshots/ja/ipad13/1_suggestion.png
+        - screenshots/ja/ipad13/2_playing.png
+        - screenshots/ja/ipad13/3_all_games.png
+        - screenshots/ja/ipad13/4_favorites.png
+        - screenshots/ja/ipad13/5_context.png
+      APP_IPHONE_65: []
+    whatsNew: |-
+      使いやすさを大きく見直しました。
+
+      ・すべての遊びを一覧から探せるようになりました（検索つき）
+      ・遊んでいるときに使えるタイマー（1・3・5分）を追加しました
+      ・「AIで遊びを作る」が使えなくなっていた問題を修正しました
+      ・「その場に合わせる」をオンにしたときだけ、位置情報とマイクの許可をお願いするようにしました。起動してすぐ遊べます
+      ・「その場に合わせる」が正しく動いていなかった問題を修正しました
+      ・「次」で同じ遊びが続けて出ないようにし、待ち時間も短くしました
+      ・AIで遊びを作れなかったときに、お知らせするようにしました
+      ・「みんなの遊び」に通報機能を追加しました
+      ・iPadで読みやすくしました
+      ・遊びを共有するときのリンクを、App Store のページに変更しました
+    description: |-
+      「何して遊ぶ？」で迷う時間を、ゼロに。
+
+      Preplayは、道具なし・準備なしでその場ですぐ遊べるゲームを、ボタンひとつで提案するアプリです。
+      電車の待ち時間、飲み会、ドライブ、旅行の移動中。スマホを見ていた時間を、みんなで笑える時間に変えます。
+
+      ■ 主な機能
+
+      ・その場に合った遊びを提案
+      「その場に合わせる」をオンにすると、静かな場所か、にぎやかな場所か、歩いているかを読み取って、今できる遊びを選びます。
+
+      ・42種類の定番ゲーム
+      ワードウルフ、ウミガメのスープ、山手線ゲーム、NGワードゲーム、インサイダー、人狼、連想しりとり、2つの真実と1つの嘘 など。ルールは短くまとめてあるので、初めての人ともすぐ遊べます。
+
+      ・お題もタイマーもおまかせ
+      お題が必要なゲームは、ボタンを押すとお題が出ます。自分たちだけのお題を追加することもできます。1・3・5分のタイマーも使えます。
+
+      ・すべての遊びから探す
+      知っている遊びは、一覧や検索からすぐ呼び出せます。
+
+      ・AIがオリジナルの遊びを考案
+      定番に飽きたら、AIがその場の状況に合わせた新しい遊びを考えます。
+
+      ・お気に入り・シェア
+      気に入った遊びは保存して、いつでも呼び出せます。友達に送ったり、「みんなの遊び」に公開したりもできます。
+
+      ・みんなの遊び
+      ほかのユーザーが考えた遊びを見つけて、試せます。不適切な内容は通報できます。
+
+      ■ プライバシー
+      位置情報・動き・周りの音の大きさは、「その場に合わせる」をオンにしたときだけ、状況の判断のために端末の中で使います。音声の録音や、位置情報そのものの送信はしません。AIで遊びを考えるときだけ、「静か」「歩いている」などの状況を表す言葉をサーバーに送ります。
+
+      ■ お問い合わせ
+      contact@enludus.com

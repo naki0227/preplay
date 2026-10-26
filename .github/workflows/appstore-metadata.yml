@@ -1,0 +1,59 @@
+name: App Store metadata
+
+# appstore/metadata.yaml -> App Store Connect
+#   pull request: dry run (shows the diff in the log)
+#   push to main: apply
+#   manual: dry run, or apply when "apply" is checked
+# Never submits for review.
+on:
+  pull_request:
+    paths: ['appstore/**', 'tools/appstore/**', 'assets/screenshot/**']
+  push:
+    branches: [main]
+    paths: ['appstore/**', 'tools/appstore/**', 'assets/screenshot/**']
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Apply changes (unchecked = dry run)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: appstore-metadata
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/appstore
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_P8" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8 are not set. Skipping App Store Connect sync."
+          fi
+      - name: Sync
+        if: steps.secrets.outputs.ok == 'true'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.apply }}" = "true" ]; then
+            npm run apply
+          else
+            npm run dry-run
+            echo
+            npm run show
+          fi

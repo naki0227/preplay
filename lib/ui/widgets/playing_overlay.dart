@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +28,7 @@ class PlayingOverlay extends StatelessWidget {
               children: [
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  child: const Icon(CupertinoIcons.clear, color: CupertinoColors.secondaryLabel),
+                  child: const Icon(CupertinoIcons.clear, color: CupertinoColors.secondaryLabel, semanticLabel: 'やめる'),
                   onPressed: () => controller.stopGame(),
                 ),
                 Text(
@@ -105,7 +106,7 @@ class PlayingOverlay extends StatelessWidget {
                         color: CupertinoColors.systemGrey6.resolveFrom(context),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(CupertinoIcons.refresh, size: 20, color: AppColors.tintColor),
+                      child: const Icon(CupertinoIcons.refresh, size: 20, color: AppColors.tintColor, semanticLabel: '別のお題'),
                     ),
                   ),
                 ],
@@ -127,6 +128,8 @@ class PlayingOverlay extends StatelessWidget {
             // For now just "Done"
             
             // Add Topic Button
+            const PlayTimer(),
+            const SizedBox(height: 8),
             CupertinoButton(
               child: const Text('お題を追加', style: TextStyle(color: AppColors.tintColor)),
               onPressed: () => _showAddTopicDialog(context),
@@ -140,7 +143,7 @@ class PlayingOverlay extends StatelessWidget {
                 child: const Text('終わり', style: TextStyle(fontWeight: FontWeight.w600)),
                 onPressed: () {
                   HapticFeedback.lightImpact();
-                  controller.stopGame();
+                  controller.finishGame();
                 },
               ),
             ),
@@ -184,6 +187,95 @@ class PlayingOverlay extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Optional countdown for games played in rounds (ワードウルフ etc.).
+class PlayTimer extends StatefulWidget {
+  const PlayTimer({super.key});
+
+  @override
+  State<PlayTimer> createState() => _PlayTimerState();
+}
+
+class _PlayTimerState extends State<PlayTimer> {
+  static const _choices = [1, 3, 5]; // minutes
+  Timer? _timer;
+  int _remaining = 0; // seconds
+  bool _finished = false;
+
+  void _start(int minutes) {
+    HapticFeedback.selectionClick();
+    _timer?.cancel();
+    setState(() {
+      _remaining = minutes * 60;
+      _finished = false;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() => _remaining--);
+      if (_remaining <= 0) {
+        t.cancel();
+        setState(() => _finished = true);
+        HapticFeedback.heavyImpact();
+      }
+    });
+  }
+
+  void _stop() {
+    _timer?.cancel();
+    setState(() {
+      _remaining = 0;
+      _finished = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  static String format(int seconds) =>
+      '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    if (_finished) {
+      return CupertinoButton(
+        onPressed: _stop,
+        child: Text('時間です！', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: CupertinoColors.systemRed.resolveFrom(context))),
+      );
+    }
+    if (_remaining > 0) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(CupertinoIcons.timer, size: 20, color: AppColors.tintColor),
+          const SizedBox(width: 6),
+          Text(format(_remaining), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()])),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            onPressed: _stop,
+            child: const Text('止める', style: TextStyle(fontSize: 14)),
+          ),
+        ],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(CupertinoIcons.timer, size: 16, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+        const SizedBox(width: 4),
+        for (final m in _choices)
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: const Size(44, 44),
+            onPressed: () => _start(m),
+            child: Text('$m分', style: const TextStyle(fontSize: 15)),
+          ),
+      ],
     );
   }
 }
