@@ -6,6 +6,7 @@
     "dry-run": "node sync.mjs ../../appstore/metadata.yaml",
     "apply": "node sync.mjs ../../appstore/metadata.yaml --apply",
     "show": "node sync.mjs ../../appstore/metadata.yaml --show",
+    "testflight": "node testflight.mjs com.preplay.preplay",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

@@ -4,6 +4,7 @@
 |---|---|---|
 | `CI`（`.github/workflows/ci.yml`） | PR と main への push | アプリの analyze・test、バックエンドの typecheck・test、ストア同期ツールの test |
 | `iOS release`（`ios-release.yml`） | **手動のみ** | IPA をビルドする。「upload」にチェックを入れると、App Store Connect（TestFlight）へアップロードする |
+| `TestFlight`（`testflight.yml`） | **手動のみ**（`iOS release` のアップロード後にも同じ処理が自動で動く） | ビルドの処理が終わるのを待ち、輸出コンプライアンスに回答（HTTPS だけなので対象外）し、内部テストグループ「内部テスト」（すべてのビルド・App Store Connect のチーム全員）を用意する。これで TestFlight アプリに届く |
 | `Supabase`（`supabase.yml`） | `supabase/` を変える PR と、main への push、手動 | マイグレーションと公式の遊びの投入。PR では使い捨ての Postgres でテストし、本番 DB は dry run。main に入ると本番 DB に当てる |
 | `App Store screenshots`（`screenshots.yml`） | `integration_test/` などを変える PR と、手動 | iPhone 6.9 インチと iPad 13 インチのシミュレーターでアプリを動かしてスクリーンショットを撮り、`appstore/screenshots/` にコミットする |
 | `App Store metadata`（`appstore-metadata.yml`） | `appstore/` を変える PR と、main への push、手動 | `appstore/metadata.yaml` の内容を App Store Connect に反映する。PR では差分を表示するだけ（dry run）。main に入ると反映する |

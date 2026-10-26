@@ -47,6 +47,8 @@
 	<true/>
 	
 	<!-- Permissions -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>移動速度を検知して、状況に合った遊びを提案するために使用します。（例：車移動中など）</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
