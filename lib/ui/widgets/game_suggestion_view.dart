@@ -52,7 +52,11 @@ class GameSuggestionView extends StatelessWidget {
                               children: [
                                 Text(game.title, style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle),
                                 const SizedBox(height: 4),
-                                Text(game.origin, style: const TextStyle(color: CupertinoColors.secondaryLabel, fontSize: 13)),
+                                Text(
+                                  [game.origin, if (game.playInfo != null) game.playInfo!].join('・'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: CupertinoColors.secondaryLabel, fontSize: 13),
+                                ),
                                 const SizedBox(height: 24),
                                 Text(game.rules, textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, height: 1.5)),
                               ],
@@ -112,6 +116,7 @@ class GameSuggestionView extends StatelessWidget {
                                 context.read<PreplayController>().generateWithAI();
                               },
                             ),
+                          if (game.id.startsWith('ai_')) _AiFeedback(game: game),
                           if (context.watch<PreplayController>().aiError case final error?)
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -318,6 +323,47 @@ class _SensingToggle extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 👍 / 👎 for an AI-made game. Good ones can be published to "みんなの遊び";
+/// the ratings also show which kinds of prompts work.
+class _AiFeedback extends StatelessWidget {
+  final GameModel game;
+  const _AiFeedback({required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<PreplayController>();
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    if (controller.isAiGameRated(game.id)) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text('評価ありがとうございます', style: TextStyle(color: secondary, fontSize: 12)),
+      );
+    }
+    Widget button(bool good) => CupertinoButton(
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            controller.rateAiGame(game, good: good);
+          },
+          child: Icon(
+            good ? CupertinoIcons.hand_thumbsup : CupertinoIcons.hand_thumbsdown,
+            size: 20,
+            color: secondary,
+            semanticLabel: good ? 'この遊びは良かった' : 'この遊びはいまいち',
+          ),
+        );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('この遊びはどうでしたか？', style: TextStyle(color: secondary, fontSize: 12)),
+        button(true),
+        button(false),
+      ],
     );
   }
 }

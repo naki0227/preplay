@@ -1,0 +1,65 @@
+name: Monitor
+
+# Every hour: checks the production backend, AI generation and Supabase the
+# way the app uses them (tools/monitor/check.mjs).
+# On failure opens one issue labelled "monitor" (GitHub notifies the
+# repository's watchers by email); once everything works again it comments and
+# closes the issue. What to do: docs/MONITORING.md
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node --test tools/monitor/check.test.mjs
+      - name: Check production
+        id: check
+        run: |
+          if node tools/monitor/check.mjs > result.txt; then
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
+          cat result.txt | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Open or close the issue
+        env:
+          FAILED: ${{ steps.check.outputs.failed }}
+        run: |
+          now=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M')
+          open=$(gh issue list --label monitor --state open --json number --jq '.[0].number // empty')
+          if [ "$FAILED" = true ] && [ -z "$open" ]; then
+            gh label create monitor --color B60205 --description "毎時の本番チェック" --force
+            {
+              echo "毎時のチェックで失敗しました（$now）。"
+              echo
+              cat result.txt
+              echo
+              echo "実行ログ: $RUN_URL"
+              echo "対応手順: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/docs/MONITORING.md"
+              echo
+              echo "直ると、次のチェックでこの Issue は自動で閉じます。"
+            } > body.md
+            gh issue create --title "本番で問題が起きています" --label monitor --body-file body.md
+          elif [ "$FAILED" = false ] && [ -n "$open" ]; then
+            { echo "復旧しました（$now）。"; echo; cat result.txt; } > body.md
+            gh issue close "$open" --comment "$(cat body.md)"
+          fi

@@ -20,6 +20,7 @@ It handles Gemini API calls, keeping the API Key server-side.
     Add:
     *   `GEMINI_API_KEY`: Your Google AI Studio API Key.
     *   `GEMINI_MODEL` (optional): Gemini model ID. Default is `gemini-3.1-flash-lite`.
+    *   `SUPABASE_URL` / `SUPABASE_ANON_KEY` (optional): the same public values as `config/app_config.json`. The backend then counts generation outcomes per day in Supabase (`public.bump_stat`); nothing about the person is stored. Without them, counting is skipped.
     Rate limiting is in-memory per instance (10 requests / 60 s per IP); set a monthly spend cap on the Gemini project in AI Studio as the hard cost limit.
 
 4.  **Deploy**

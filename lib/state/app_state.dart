@@ -4,6 +4,7 @@ import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/game_model.dart';
 import '../data/game_repository.dart';
+import '../services/ai_service.dart';
 import '../services/situation_service.dart';
 
 enum PreplayState { detecting, suggested, thinking, playing }
@@ -37,6 +38,7 @@ class PreplayController extends ChangeNotifier {
   List<GameModel> get savedGames => _gameRepository.savedGames;
   List<GameModel> get communityGames => _gameRepository.communityGames;
   String? get communityError => _gameRepository.communityError;
+  String? get communityNotice => _gameRepository.communityNotice;
   bool get isCommunityLoading => _isCommunityLoading;
 
   PreplayController() {
@@ -128,16 +130,32 @@ class PreplayController extends ChangeNotifier {
     notifyListeners();
 
     final contextTags = await _currentTags();
-    final generatedGame = await _gameRepository.generateAiGame(contextTags); // Via repo
-
-    if (generatedGame != null) {
-      _currentGame = generatedGame;
-    } else {
+    try {
+      _currentGame = await _gameRepository.generateAiGame(contextTags);
+    } on AiException catch (e) {
       // Keep the current game and say why nothing changed.
-      _aiError = 'AIがうまく遊びを作れませんでした。少し待ってからもう一度試してください。';
+      _aiError = aiErrorMessage(e.reason);
     }
     _state = PreplayState.suggested;
     notifyListeners();
+  }
+
+  @visibleForTesting
+  static String aiErrorMessage(AiFailure reason) => switch (reason) {
+        AiFailure.offline => 'インターネットにつながっていないため、AIは使えません。「次」でアプリに入っている遊びは遊べます。',
+        AiFailure.busy => 'AIを短い時間に使いすぎました。1分ほど待ってからもう一度試してください。',
+        AiFailure.other => 'AIがうまく遊びを作れませんでした。少し待ってからもう一度試してください。',
+      };
+
+  // AI games rated in this session (each generated game has a new id).
+  final Set<String> _ratedAiGames = {};
+  bool isAiGameRated(String gameId) => _ratedAiGames.contains(gameId);
+
+  /// 👍 / 👎 for an AI-made game. Thanks the user even if sending failed.
+  Future<void> rateAiGame(GameModel game, {required bool good}) async {
+    if (!_ratedAiGames.add(game.id)) return;
+    notifyListeners();
+    await _gameRepository.rateAiGame(game, good: good);
   }
 
   void _matchGameByContext(List<String> tags) {

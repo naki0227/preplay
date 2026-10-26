@@ -41,6 +41,12 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 - **目的**: 「AIで生成」を使ったときに、状況に合った遊びを作るため
 - **送信する情報**: 状況タグ（例:「静か」「歩いている」）と人数のみ。位置情報・音声そのものは送信しません
 - **送信先**: 本アプリのサーバーを経由して Google Gemini API に送信されます
+- **集計**: サーバーは、AI で遊びを作った回数を、日付と結果（成功・失敗など）ごとの数だけ記録します。誰が使ったかは記録しません
+
+#### 2.6 AIが作った遊びの評価（任意）
+- **目的**: AI が作る遊びを良くするため。評価の高い遊びは「みんなの遊び」に載せることがあります
+- **送信する情報**: 👍 / 👎 を押したときに、その遊びの名前・遊び方・状況タグと評価のみ。端末やユーザーを特定する情報は送信しません
+- **保存**: Supabase（クラウドデータベース）に保存
 
 ### 3. 情報の第三者提供
 本アプリは、法令に基づく場合を除き、ユーザーの個人情報を第三者に提供しません。
@@ -88,6 +94,12 @@ Location, motion and audio level are used only when "その場に合わせる" (
 - **Purpose**: To generate a game when you use the AI generation feature
 - **Data sent**: Context tags only (e.g. "quiet", "walking") and group size. Raw location and audio are never sent
 - **Recipient**: Sent via the App's server to the Google Gemini API
+- **Counts**: The server records only how many generations succeeded or failed per day. Nothing about who used it is recorded
+
+#### 2.6 Ratings of AI-made Games (Optional)
+- **Purpose**: To improve the games the AI makes. Highly rated games may be added to "Community Games"
+- **Data sent**: When you tap 👍 / 👎, only that game's name, rules, context tags and the rating. Nothing that identifies you or your device
+- **Storage**: Stored in Supabase (cloud database)
 
 ### 3. Third-Party Sharing
 We do not share personal information with third parties except as required by law.

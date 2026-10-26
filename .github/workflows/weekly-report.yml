@@ -1,0 +1,44 @@
+name: Weekly report
+
+# Every Monday morning (Japan time): numbers for the last 7 days from Supabase
+# (supabase/reports/weekly.sql) as a new issue labelled "weekly-report"; last
+# week's issue is closed. Needs the repository secret SUPABASE_DB_URL.
+on:
+  schedule:
+    - cron: '23 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::SUPABASE_DB_URL is not set."; exit 1; fi
+      - name: Build the report
+        run: |
+          {
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -q -f supabase/reports/weekly.sql
+            echo
+            echo "## App Store"
+            echo
+            echo "ダウンロード数・セッション数・クラッシュは [App Store Connect の App 分析](https://appstoreconnect.apple.com/analytics) で見られます。"
+          } > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post as an issue
+        run: |
+          range="$(TZ=Asia/Tokyo date -d '7 days ago' '+%m/%d')〜$(TZ=Asia/Tokyo date -d '1 day ago' '+%m/%d')"
+          gh label create weekly-report --color 0E8A16 --description "毎週の数字" --force
+          for n in $(gh issue list --label weekly-report --state open --json number --jq '.[].number'); do
+            gh issue close "$n"
+          done
+          gh issue create --title "週間レポート $range" --label weekly-report --body-file report.md
