@@ -31,6 +31,10 @@ select E'## AIで遊びを作った回数\n\n'
          coalesce((select sum(count) from public.daily_stats s join report_days r using (day) where s.kind = 'ai_invalid'), 0))
 from report_days d;
 
+select format(E'\nAIでお題を増やした回数: 成功 %s ／ 失敗 %s\n',
+  coalesce((select sum(count) from public.daily_stats s join report_days r using (day) where s.kind = 'topics_ok'), 0),
+  coalesce((select sum(count) from public.daily_stats s join report_days r using (day) where s.kind = 'topics_error'), 0));
+
 -- 2. Ratings of AI games
 with f as (
   select * from public.ai_feedback, report_range

@@ -20,14 +20,15 @@ class RoleDealScreen extends StatefulWidget {
 
 class _RoleDealScreenState extends State<RoleDealScreen> {
   late final Random _random = widget.random ?? Random();
-  late int _players = _clamp(widget.game.minPlayers == null ? 4 : max(widget.game.minPlayers!, 4));
+  late final (int, int) _range = RoleDeal.playerRange(widget.game);
+  late int _players = _clamp(max(_min, 4));
   RoleDeal? _deal;
   int _index = 0;
   bool _revealed = false;
   bool _showAnswer = false;
 
-  int get _min => widget.game.minPlayers ?? 3;
-  int get _max => widget.game.maxPlayers ?? 10;
+  int get _min => _range.$1;
+  int get _max => _range.$2;
   int _clamp(int n) => n.clamp(_min, _max);
 
   void _start() {

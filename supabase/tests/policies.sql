@@ -48,6 +48,7 @@ do $$ begin
   perform public.bump_stat('ai_ok');
   perform public.bump_stat('ai_ok');
   perform public.bump_stat('ai_error');
+  perform public.bump_stat('topics_ok');
   begin
     perform public.bump_stat('anything else');
     raise exception 'unknown stat kind was accepted';

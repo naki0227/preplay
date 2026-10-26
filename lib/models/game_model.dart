@@ -1,3 +1,23 @@
+/// A secret role in an AI-made game, dealt by passing the phone
+/// (see lib/models/role_deal.dart). count 0 means "everyone else".
+class DealRole {
+  final String name;
+  final int count;
+  final bool seesTopic;
+  final String hint;
+
+  const DealRole({required this.name, required this.count, required this.seesTopic, required this.hint});
+
+  Map<String, dynamic> toJson() => {'name': name, 'count': count, 'seesTopic': seesTopic, 'hint': hint};
+
+  factory DealRole.fromJson(Map<String, dynamic> json) => DealRole(
+        name: json['name'] as String,
+        count: json['count'] as int,
+        seesTopic: json['seesTopic'] == true,
+        hint: (json['hint'] as String?) ?? '',
+      );
+}
+
 class GameModel {
   final String id;
   final String title;
@@ -10,6 +30,8 @@ class GameModel {
   final int? minPlayers;
   final int? maxPlayers;
   final int? minutes;
+  // Secret roles of an AI-made game; empty for everything else.
+  final List<DealRole> roles;
 
   const GameModel({
     required this.id,
@@ -21,6 +43,7 @@ class GameModel {
     this.minPlayers,
     this.maxPlayers,
     this.minutes,
+    this.roles = const [],
   });
 
   /// "2〜8人・約5分", or null when unknown.
@@ -44,6 +67,7 @@ class GameModel {
       if (minPlayers != null) 'minPlayers': minPlayers,
       if (maxPlayers != null) 'maxPlayers': maxPlayers,
       if (minutes != null) 'minutes': minutes,
+      if (roles.isNotEmpty) 'roles': [for (final r in roles) r.toJson()],
     };
   }
 
@@ -58,6 +82,9 @@ class GameModel {
       minPlayers: json['minPlayers'] as int?,
       maxPlayers: json['maxPlayers'] as int?,
       minutes: json['minutes'] as int?,
+      roles: [
+        for (final r in (json['roles'] as List?) ?? const []) DealRole.fromJson(Map<String, dynamic>.from(r as Map)),
+      ],
     );
   }
 

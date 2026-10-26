@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/game_model.dart';
+import '../models/role_deal.dart';
 import '../data/game_repository.dart';
 import '../services/ai_service.dart';
 import '../services/situation_service.dart';
@@ -193,6 +194,41 @@ class PreplayController extends ChangeNotifier {
   /// The current game's topics plus the ones the user added.
   List<String> get allTopics => [...?_currentGame?.topics, ..._customTopics];
 
+  bool _topicsLoading = false;
+  bool get topicsLoading => _topicsLoading;
+  // "お題を5個増やしました" or why it failed; cleared when a game starts or stops.
+  String? _topicsMessage;
+  String? get topicsMessage => _topicsMessage;
+
+  /// "AIでお題を増やす": asks the AI for new topics and keeps them like the
+  /// user's own. Shows one of them unless the topic must stay secret.
+  Future<void> generateMoreTopics() async {
+    final game = _currentGame;
+    if (game == null || _topicsLoading) return;
+    _topicsLoading = true;
+    _topicsMessage = null;
+    notifyListeners();
+    try {
+      final existing = allTopics;
+      final added = <String>[];
+      for (final t in await _gameRepository.moreTopics(game, existing)) {
+        if (existing.contains(t) || added.contains(t)) continue;
+        await _gameRepository.addCustomTopic(game.id, t);
+        added.add(t);
+      }
+      if (_currentGame?.id == game.id) {
+        _customTopics.addAll(added);
+        if (added.isNotEmpty && !RoleDeal.supports(game)) _currentTopic = added.first;
+      }
+      _topicsMessage = 'お題を${added.length}個増やしました';
+    } on AiException catch (e) {
+      _topicsMessage = aiErrorMessage(e.reason);
+    } finally {
+      _topicsLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> selectGame(GameModel game) async {
     _currentGame = game;
     _aiError = null;
@@ -213,6 +249,7 @@ class PreplayController extends ChangeNotifier {
 
   void playGame() {
     if (_currentGame == null) return;
+    _topicsMessage = null;
     _pickRandomTopic();
     _state = PreplayState.playing;
     notifyListeners();
@@ -270,6 +307,7 @@ class PreplayController extends ChangeNotifier {
   static bool shouldAskForReview(int completedPlays) => const {3, 10, 30}.contains(completedPlays);
 
   void stopGame() {
+    _topicsMessage = null;
     _state = PreplayState.suggested;
     _currentTopic = null;
     notifyListeners();

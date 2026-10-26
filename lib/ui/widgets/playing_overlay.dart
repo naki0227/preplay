@@ -154,12 +154,44 @@ class PlayingOverlay extends StatelessWidget {
             // Add Topic Button
             const PlayTimer(),
             const SizedBox(height: 8),
-            if (game.topics.isNotEmpty)
-              CupertinoButton(
-                child: const Text('お題を追加', style: TextStyle(color: AppColors.tintColor)),
-                onPressed: () => _showAddTopicDialog(context, game.id == 'word_wolf'),
-              )
-            else
+            if (game.topics.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: const Text('お題を追加', style: TextStyle(color: AppColors.tintColor)),
+                    onPressed: () => _showAddTopicDialog(context, game.id == 'word_wolf'),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    onPressed: controller.topicsLoading
+                        ? null
+                        : () {
+                            HapticFeedback.selectionClick();
+                            controller.generateMoreTopics();
+                          },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (controller.topicsLoading)
+                          const CupertinoActivityIndicator(radius: 8)
+                        else
+                          const Icon(CupertinoIcons.sparkles, size: 16, color: CupertinoColors.systemIndigo),
+                        const SizedBox(width: 4),
+                        const Text('AIでお題を増やす', style: TextStyle(color: CupertinoColors.systemIndigo)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (controller.topicsMessage case final message?)
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                ),
+            ] else
               const SizedBox(height: 44),
             const SizedBox(height: 8),
 

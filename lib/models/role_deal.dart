@@ -15,13 +15,28 @@ class RoleDeal {
 
   static const _supported = {'word_wolf', 'insider_game', 'mafia'};
 
-  static bool supports(GameModel game) => _supported.contains(game.id);
+  static bool supports(GameModel game) => _supported.contains(game.id) || game.roles.isNotEmpty;
+
+  /// Smallest and largest group the dealing screen offers.
+  static (int, int) playerRange(GameModel game) {
+    if (game.roles.isNotEmpty) {
+      final fixed = _fixedCount(game);
+      return (fixed + 1, max(fixed + 1, 12));
+    }
+    return (game.minPlayers ?? 3, game.maxPlayers ?? 10);
+  }
+
+  static int _fixedCount(GameModel game) => game.roles.fold(0, (n, r) => n + r.count);
 
   /// Shown on the setup screen, e.g. "ウルフは1人".
   static String describe(GameModel game, int players) => switch (game.id) {
         'word_wolf' => 'ウルフは${wolfCount(players)}人',
         'insider_game' => 'マスター1人・インサイダー1人・庶民${players - 2}人',
         'mafia' => 'マフィア${mafiaCount(players)}人・市民${players - mafiaCount(players)}人（進行役は人数に入れません）',
+        _ when game.roles.isNotEmpty => [
+            for (final r in game.roles)
+              '${r.name}${r.count == 0 ? players - _fixedCount(game) : r.count}人',
+          ].join('・'),
         _ => '',
       };
 
@@ -74,7 +89,40 @@ class RoleDeal {
           answer: 'マフィア：${_numbers(mafia)}',
         );
     }
+    if (game.roles.isNotEmpty) return _dealCustom(game, players, topics, random);
     throw ArgumentError('No roles for ${game.id}');
+  }
+
+  // Roles written by the AI (GameModel.roles).
+  static RoleDeal _dealCustom(GameModel game, int players, List<String> topics, Random random) {
+    final topic = topics.isEmpty ? null : topics[random.nextInt(topics.length)];
+    final order = List.generate(players, (i) => i)..shuffle(random);
+    final rest = game.roles.firstWhere((r) => r.count == 0);
+    final assigned = List<DealRole>.filled(players, rest);
+    final byRole = <DealRole, Set<int>>{};
+    var next = 0;
+    for (final role in game.roles.where((r) => r.count > 0)) {
+      for (var k = 0; k < role.count && next < players; k++) {
+        assigned[order[next]] = role;
+        (byRole[role] ??= {}).add(order[next]);
+        next++;
+      }
+    }
+    return RoleDeal(
+      cards: [
+        for (final role in assigned)
+          [
+            'あなたは',
+            role.name,
+            if (role.seesTopic && topic != null) 'お題：$topic',
+            if (role.hint.isNotEmpty) role.hint,
+          ].join('\n'),
+      ],
+      answer: [
+        for (final e in byRole.entries) '${e.key.name}：${_numbers(e.value)}',
+        if (topic != null && game.roles.any((r) => r.seesTopic)) 'お題：$topic',
+      ].join('\n'),
+    );
   }
 
   /// "うどん vs そば" (also "VS" or "対") → [うどん, そば]; null if not a pair.
