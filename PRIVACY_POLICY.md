@@ -1,6 +1,9 @@
 # プライバシーポリシー / Privacy Policy
 
-**最終更新日 / Last Updated: 2026-10-20**
+**最終更新日 / Last Updated: 2026-10-26**
+
+> 公開版は https://enludus.com/products/preplay-privacy です（App Store に載せている URL）。内容を変えるときは、両方を同じにしてください。
+> The published version is https://enludus.com/products/preplay-privacy. Keep both in sync.
 
 ---
 
