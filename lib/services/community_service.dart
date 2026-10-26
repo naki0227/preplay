@@ -66,4 +66,24 @@ class CommunityService {
       return false;
     }
   }
+
+  /// Sends a 👍 / 👎 for an AI-made game. Only the game itself and the
+  /// rating are sent. Returns false on failure.
+  Future<bool> sendAiFeedback(GameModel game, {required bool good}) async {
+    final client = _client;
+    if (client == null) return false;
+    String clip(String s, int max) => s.length <= max ? s : s.substring(0, max);
+    try {
+      await client.from('ai_feedback').insert({
+        'title': clip(game.title, 60),
+        'rules': clip(game.rules, 1000),
+        'tags': game.tags.take(10).toList(),
+        'good': good,
+      });
+      return true;
+    } catch (e) {
+      print('AI Feedback Error: $e');
+      return false;
+    }
+  }
 }

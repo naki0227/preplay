@@ -61,6 +61,29 @@ async function generateText(prompt: string, apiKey: string): Promise<string> {
   return text;
 }
 
+// Daily counters in Supabase (public.bump_stat, see supabase/migrations).
+// Only the kind of outcome is stored: no IP, no tags, nothing per person.
+// Skipped when SUPABASE_URL / SUPABASE_ANON_KEY are not set, and never fails
+// the request.
+export type StatKind = 'ai_ok' | 'ai_error' | 'ai_rate_limited' | 'ai_invalid';
+async function bumpStat(kind: StatKind, monitor: boolean): Promise<void> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  // The hourly check (tools/monitor) is not a user; keep it out of the numbers.
+  if (!url || !key || monitor) return;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/bump_stat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key },
+      body: JSON.stringify({ stat_kind: kind }),
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) console.error(`bump_stat ${kind}: ${res.status}`);
+  } catch (e) {
+    console.error(`bump_stat ${kind} failed`, e);
+  }
+}
+
 // Use Vercel Edge Runtime
 export const config = {
   runtime: 'edge'
@@ -85,21 +108,26 @@ app.use('/*', cors());
 
 // --- POST /api/generate ---
 app.post('/generate', async (c) => {
+  const monitor = c.req.header('x-preplay-monitor') === '1';
+
   // Rate Limit Check
   const ip = clientIp(c.req.header('x-forwarded-for'));
   if (!memoryLimit(ip, 10, 60_000)) {
+    await bumpStat('ai_rate_limited', monitor);
     return c.json({ error: 'Rate limit exceeded. Please try again later.' }, 429);
   }
 
   try {
     const parsed = parseRequest(await c.req.json().catch(() => null));
     if (!parsed) {
+      await bumpStat('ai_invalid', monitor);
       return c.json({ error: 'Invalid request' }, 400);
     }
     const { tags, groupSize } = parsed;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
+      await bumpStat('ai_error', monitor);
       return c.json({ error: 'Server configuration error' }, 500);
     }
 
@@ -116,9 +144,11 @@ app.post('/generate', async (c) => {
     // newer models tend to add (e.g. "**ゲーム名:**").
     const gameText = (await generateText(prompt, apiKey)).replace(/[*#`]/g, '').trim();
 
+    await bumpStat('ai_ok', monitor);
     return c.json({ game: gameText });
   } catch (e) {
     console.error(e);
+    await bumpStat('ai_error', monitor);
     return c.json({ error: 'Failed to generate game' }, 500);
   }
 });

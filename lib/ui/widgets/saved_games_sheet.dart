@@ -158,9 +158,13 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
           children: [
             const Icon(CupertinoIcons.exclamationmark_circle, color: CupertinoColors.systemRed, size: 48),
             const SizedBox(height: 16),
-            Text(
-              error,
-              style: const TextStyle(color: CupertinoColors.secondaryLabel),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: CupertinoColors.secondaryLabel),
+              ),
             ),
             const SizedBox(height: 16),
             CupertinoButton(
@@ -191,7 +195,8 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
       );
     }
 
-    return ListView.separated(
+    final notice = controller.communityNotice;
+    final list = ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: games.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -234,6 +239,30 @@ class _SavedGamesSheetState extends State<SavedGamesSheet> {
           ),
         );
       },
+    );
+    if (notice == null) return list;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: Row(
+            children: [
+              const Icon(CupertinoIcons.wifi_slash, size: 14, color: CupertinoColors.secondaryLabel),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(notice, style: const TextStyle(color: CupertinoColors.secondaryLabel, fontSize: 12)),
+              ),
+              CupertinoButton(
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.all(8),
+                onPressed: () => controller.loadCommunityGames(),
+                child: const Text('再読み込み', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: list),
+      ],
     );
   }
 

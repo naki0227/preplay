@@ -39,6 +39,10 @@ lib/
     └── widgets/         # DetectiveView, SuggestionView, etc.
 ```
 
+## 📈 Monitoring
+
+Production is checked every hour and weekly numbers are posted as an issue. See [docs/MONITORING.md](docs/MONITORING.md).
+
 ## 🔧 Build
 
 APIキーはアプリに入れません。Gemini のキーはバックエンド（`backend/`、Vercel）の環境変数だけに置きます。
