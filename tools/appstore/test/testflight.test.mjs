@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { prepareTestFlight, GROUP_NAME } from '../testflight.mjs';
 
 // A tiny fake of the App Store Connect API.
-function fakeAsc({ states = ['VALID'], encryption = null, group = null, testers = [], users = [], existingTesters = [] } = {}) {
+function fakeAsc({ states = ['VALID'], encryption = null, group = null, testers = [], users = [], existingTesters = [], otherGroups = [], refuse = false } = {}) {
   const calls = [];
   let poll = 0;
   const api = async (method, path, body) => {
@@ -13,7 +13,12 @@ function fakeAsc({ states = ['VALID'], encryption = null, group = null, testers 
       const state = states[Math.min(poll++, states.length - 1)];
       return { data: state ? [{ id: 'b1', attributes: { version: '202610260654', processingState: state, usesNonExemptEncryption: encryption } }] : [] };
     }
-    if (method === 'GET' && path.startsWith('/v1/betaGroups?')) return { data: group ? [group] : [] };
+    if (method === 'GET' && path.startsWith('/v1/betaGroups?')) {
+      return { data: [...(group ? [group] : []), ...(path.includes('filter[name]') ? [] : otherGroups)] };
+    }
+    if (method === 'POST' && path.includes('/relationships/betaTesters') && refuse) {
+      throw new Error(`POST ${path} -> 409: {"errors":[{"detail" : "Tester(s) cannot be assigned"}]}`);
+    }
     if (method === 'POST' && path === '/v1/betaGroups') {
       return { data: { id: 'g1', attributes: body.data.attributes } };
     }
@@ -84,5 +89,22 @@ test('fails clearly on a broken build or a timeout, and never prints e-mail addr
   );
   const ok = fakeAsc({ users: [user('secret@example.com')] });
   await prepareTestFlight(() => ok.api, 'x', '1', { ...quiet, log });
+  assert.ok(lines.every((l) => !l.includes('@')));
+});
+
+test('a refused tester is reported, not fatal; other internal groups get the build', async () => {
+  const lines = [];
+  const { api, calls } = fakeAsc({
+    encryption: false,
+    group: { id: 'g9', attributes: { isInternalGroup: true, hasAccessToAllBuilds: true } },
+    otherGroups: [{ id: 'old', attributes: { isInternalGroup: true, hasAccessToAllBuilds: false } }],
+    users: [{ attributes: { username: 'owner@example.com', roles: ['ADMIN'], allAppsVisible: true } }],
+    existingTesters: [{ id: 't1', attributes: { email: 'owner@example.com' } }],
+    refuse: true,
+  });
+  const r = await prepareTestFlight(() => api, 'x', '1', { ...quiet, log: (l) => lines.push(l) });
+  assert.equal(r.refused, 1);
+  assert.ok(calls.find((c) => c.path === '/v1/betaGroups/old/relationships/builds'));
+  assert.ok(lines.some((l) => l.includes('Tester(s) cannot be assigned') && l.includes('ADMIN')));
   assert.ok(lines.every((l) => !l.includes('@')));
 });
