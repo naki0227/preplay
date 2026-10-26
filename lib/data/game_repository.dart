@@ -134,6 +134,11 @@ class GameRepository {
     return _aiService.generateGame(tags);
   }
 
+  /// Throws [AiException].
+  Future<List<String>> moreTopics(GameModel game, List<String> existing) {
+    return _aiService.moreTopics(game, existing);
+  }
+
   Future<bool> rateAiGame(GameModel game, {required bool good}) {
     return _communityService.sendAiFeedback(game, good: good);
   }

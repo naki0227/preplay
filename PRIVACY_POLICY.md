@@ -43,6 +43,10 @@ Preplay（以下「本アプリ」）は、ユーザーのプライバシーを�
 - **送信先**: 本アプリのサーバーを経由して Google Gemini API に送信されます
 - **集計**: サーバーは、AI で遊びを作った回数を、日付と結果（成功・失敗など）ごとの数だけ記録します。誰が使ったかは記録しません
 
+#### 2.5.1 AIでお題を増やす（任意）
+- **送信する情報**: 「AIでお題を増やす」を押したときに、遊びの名前・遊び方と、その遊びのお題（自分で追加したお題を含む）
+- **送信先**: 本アプリのサーバーを経由して Google Gemini API。サーバーは保存せず、日ごとの回数だけを数えます
+
 #### 2.6 AIが作った遊びの評価（任意）
 - **目的**: AI が作る遊びを良くするため。評価の高い遊びは「みんなの遊び」に載せることがあります
 - **送信する情報**: 👍 / 👎 を押したときに、その遊びの名前・遊び方・状況タグと評価のみ。端末やユーザーを特定する情報は送信しません
@@ -95,6 +99,10 @@ Location, motion and audio level are used only when "その場に合わせる" (
 - **Data sent**: Context tags only (e.g. "quiet", "walking") and group size. Raw location and audio are never sent
 - **Recipient**: Sent via the App's server to the Google Gemini API
 - **Counts**: The server records only how many generations succeeded or failed per day. Nothing about who used it is recorded
+
+#### 2.5.1 More Topics with AI (Optional)
+- **Data sent**: When you tap "AIでお題を増やす", the game's name, rules and its topics (including ones you added)
+- **Recipient**: Sent via the App's server to the Google Gemini API. The server does not store them; it only counts requests per day
 
 #### 2.6 Ratings of AI-made Games (Optional)
 - **Purpose**: To improve the games the AI makes. Highly rated games may be added to "Community Games"
