@@ -46,16 +46,23 @@ localizations:
     promotionalText: ワードウルフ、ウミガメのスープ、山手線ゲームなど42種類。道具も準備もいらない「その場で遊べるゲーム」を、ボタンひとつで提案します。
     supportUrl: https://enludus.com
     marketingUrl: https://enludus.com
-    # iPhone screenshots in the order they were taken. "keep" reuses the
-    # images already in App Store Connect (they were resized for the 6.5"
-    # slot, so the originals in assets/screenshot are not uploaded again).
-    # iPad ones are not listed, so they stay as they are.
+    # Taken by CI (.github/workflows/screenshots.yml) on iPhone 6.9" and iPad 13"
+    # simulators. App Store scales the 6.9" set for smaller iPhones, so the
+    # old 6.5" set is cleared.
     screenshots:
-      APP_IPHONE_65:
-        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.00.59.png
-        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.10.png
-        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.25.png
-        - keep: Simulator Screenshot - iPhone 15 Pro - 2026-02-07 at 12.01.28.png
+      APP_IPHONE_67:
+        - screenshots/ja/iphone69/1_suggestion.png
+        - screenshots/ja/iphone69/2_playing.png
+        - screenshots/ja/iphone69/3_all_games.png
+        - screenshots/ja/iphone69/4_favorites.png
+        - screenshots/ja/iphone69/5_context.png
+      APP_IPAD_PRO_3GEN_129:
+        - screenshots/ja/ipad13/1_suggestion.png
+        - screenshots/ja/ipad13/2_playing.png
+        - screenshots/ja/ipad13/3_all_games.png
+        - screenshots/ja/ipad13/4_favorites.png
+        - screenshots/ja/ipad13/5_context.png
+      APP_IPHONE_65: []
     whatsNew: |-
       使いやすさを大きく見直しました。
 

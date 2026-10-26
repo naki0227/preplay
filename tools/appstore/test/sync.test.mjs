@@ -231,3 +231,11 @@ test('screenshots: keep of an unknown file fails before writing', async () => {
   await assert.rejects(sync(api, meta, { apply: true, log: () => {} }), /not in App Store Connect/);
   assert.ok(calls.every((c) => c.method === 'GET'));
 });
+
+test('screenshots: an empty list clears that display type', async () => {
+  const { api, calls } = screenshotApi(['m0', 'm1']);
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { screenshots: { APP_IPHONE_67: [] } } } };
+  await sync(api, meta, { apply: true, log: () => {} });
+  const deleted = calls.filter((c) => c.method === 'DELETE').map((c) => c.path);
+  assert.deepEqual(deleted, ['/v1/appScreenshots/OLD0', '/v1/appScreenshots/OLD1']);
+});
