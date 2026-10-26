@@ -39,8 +39,9 @@ void main() {
 
     // 2. Playing with a topic and the timer buttons. Fixed topic and no running
     // timer, so the image is identical on every run (no needless re-upload).
+    await controller.selectGame(_game('gesture_game'));
     controller.playGame();
-    controller.debugSetTopic('きのこ vs たけのこ');
+    controller.debugSetTopic('サーフィン');
     await _settle(tester);
     await binding.takeScreenshot('2_playing');
     controller.stopGame();

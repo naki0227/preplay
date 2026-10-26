@@ -190,6 +190,9 @@ class PreplayController extends ChangeNotifier {
   
   List<String> _customTopics = [];
 
+  /// The current game's topics plus the ones the user added.
+  List<String> get allTopics => [...?_currentGame?.topics, ..._customTopics];
+
   Future<void> selectGame(GameModel game) async {
     _currentGame = game;
     _aiError = null;

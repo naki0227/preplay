@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../models/role_deal.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_colors.dart';
+import 'role_deal_screen.dart';
 
 class PlayingOverlay extends StatelessWidget {
   const PlayingOverlay({super.key});
@@ -65,8 +67,30 @@ class PlayingOverlay extends StatelessWidget {
             
             const SizedBox(height: 32),
             
-            // Topic Display
-            if (topic != null) ...[
+            // Games with secret roles: the topic must not be on screen for everyone.
+            if (RoleDeal.supports(game)) ...[
+              SizedBox(
+                width: double.infinity,
+                child: CupertinoButton(
+                  color: CupertinoColors.systemIndigo,
+                  borderRadius: BorderRadius.circular(12),
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.of(context).push(CupertinoPageRoute(
+                      fullscreenDialog: true,
+                      builder: (_) => RoleDealScreen(game: game, topics: controller.allTopics),
+                    ));
+                  },
+                  child: const Text('役とお題を配る', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'スマホを回して、1人ずつ自分の役とお題を見ます',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel),
+              ),
+            ] else if (topic != null) ...[
               const Text(
                 'お題',
                 style: TextStyle(
@@ -130,10 +154,13 @@ class PlayingOverlay extends StatelessWidget {
             // Add Topic Button
             const PlayTimer(),
             const SizedBox(height: 8),
-            CupertinoButton(
-              child: const Text('お題を追加', style: TextStyle(color: AppColors.tintColor)),
-              onPressed: () => _showAddTopicDialog(context),
-            ),
+            if (game.topics.isNotEmpty)
+              CupertinoButton(
+                child: const Text('お題を追加', style: TextStyle(color: AppColors.tintColor)),
+                onPressed: () => _showAddTopicDialog(context, game.id == 'word_wolf'),
+              )
+            else
+              const SizedBox(height: 44),
             const SizedBox(height: 8),
 
             SizedBox(
@@ -154,7 +181,7 @@ class PlayingOverlay extends StatelessWidget {
     );
   }
 
-  void _showAddTopicDialog(BuildContext context) {
+  void _showAddTopicDialog(BuildContext context, bool pair) {
     final controller = TextEditingController();
     showCupertinoDialog(
       context: context,
@@ -165,7 +192,7 @@ class PlayingOverlay extends StatelessWidget {
             const SizedBox(height: 16),
             CupertinoTextField(
               controller: controller,
-              placeholder: '新しいお題を入力...',
+              placeholder: pair ? '例：うどん vs そば' : '新しいお題を入力...',
               autofocus: true,
             ),
           ],
