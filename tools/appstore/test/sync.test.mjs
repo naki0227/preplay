@@ -98,6 +98,15 @@ test('apply creates the version when missing', async () => {
   assert.equal(create.body.data.attributes.platform, 'IOS');
 });
 
+test('store text has no emoji (App Store Connect rejects them with 409)', () => {
+  const texts = [];
+  (function walk(v) {
+    if (typeof v === 'string') texts.push(v);
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  })(meta);
+  for (const t of texts) assert.doesNotMatch(t, /\p{Extended_Pictographic}/u, t.slice(0, 40));
+});
+
 test('metadata version matches pubspec.yaml', () => {
   const pubspec = readFileSync(new URL('../../../pubspec.yaml', import.meta.url), 'utf8');
   const v = pubspec.match(/^version:\s*([0-9.]+)/m)[1];
