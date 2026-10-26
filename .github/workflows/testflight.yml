@@ -1,0 +1,32 @@
+name: TestFlight
+
+# Makes an already uploaded build installable from TestFlight by the team:
+# waits for processing, answers export compliance, and keeps the internal
+# group "内部テスト" (all builds, every App Store Connect user) in place.
+# iOS release runs the same step after each upload; this is for re-runs.
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Build number (empty: the newest build)'
+        required: false
+
+jobs:
+  testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: tools/appstore
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          BUILD: ${{ inputs.build }}
+        run: node testflight.mjs com.preplay.preplay "$BUILD"

@@ -93,6 +93,21 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
+      - uses: actions/setup-node@v5
+        if: ${{ inputs.upload }}
+        with:
+          node-version: 22
+      - name: TestFlight (team testers, export compliance)
+        if: ${{ inputs.upload }}
+        working-directory: tools/appstore
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          npm ci
+          node testflight.mjs com.preplay.preplay "$BUILD_NUMBER"
+
       - name: Keep IPA
         if: ${{ !inputs.upload }}
         uses: actions/upload-artifact@v4
