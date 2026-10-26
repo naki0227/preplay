@@ -74,34 +74,54 @@ export async function prepareTestFlight(apiFactory, bundleId, buildNumber, opts 
     log(`group "${GROUP_NAME}": build added`);
   }
 
+  // Other internal groups made in App Store Connect also get the build.
+  const others = (await api('GET', `/v1/betaGroups?filter[app]=${app.id}&limit=50`)).data
+    .filter((g) => g.id !== group.id && g.attributes.isInternalGroup);
+  for (const g of others) {
+    if (!g.attributes.hasAccessToAllBuilds) {
+      await api('POST', `/v1/betaGroups/${g.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
+    }
+  }
+  if (others.length) log(`other internal groups: ${others.length} (build available in all of them)`);
+
   // Everyone on the team (App Store Connect users) as an internal tester.
+  // Apple refuses some users (e.g. no access to this app); that is reported,
+  // not fatal: the build is ready either way.
   const users = (await api('GET', '/v1/users?limit=200')).data;
   const inGroup = new Set(
     (await api('GET', `/v1/betaGroups/${group.id}/betaTesters?limit=200`)).data
       .map((t) => t.attributes.email?.toLowerCase()),
   );
   let added = 0;
-  for (const user of users) {
+  const refused = [];
+  for (const [i, user] of users.entries()) {
     const email = user.attributes.username;
     if (!email || inGroup.has(email.toLowerCase())) continue;
-    const existing = (await api('GET', `/v1/betaTesters?filter[email]=${encodeURIComponent(email)}`)).data[0];
-    if (existing) {
-      await api('POST', `/v1/betaGroups/${group.id}/relationships/betaTesters`, {
-        data: [{ type: 'betaTesters', id: existing.id }],
-      });
-    } else {
-      await api('POST', '/v1/betaTesters', {
-        data: {
-          type: 'betaTesters',
-          attributes: { email, firstName: user.attributes.firstName, lastName: user.attributes.lastName },
-          relationships: { betaGroups: { data: [{ type: 'betaGroups', id: group.id }] } },
-        },
-      });
+    const who = `user #${i + 1} (roles: ${(user.attributes.roles ?? []).join(', ') || '?'}, all apps: ${user.attributes.allAppsVisible ?? '?'})`;
+    try {
+      const existing = (await api('GET', `/v1/betaTesters?filter[email]=${encodeURIComponent(email)}`)).data[0];
+      if (existing) {
+        await api('POST', `/v1/betaGroups/${group.id}/relationships/betaTesters`, {
+          data: [{ type: 'betaTesters', id: existing.id }],
+        });
+      } else {
+        await api('POST', '/v1/betaTesters', {
+          data: {
+            type: 'betaTesters',
+            attributes: { email, firstName: user.attributes.firstName, lastName: user.attributes.lastName },
+            relationships: { betaGroups: { data: [{ type: 'betaGroups', id: group.id }] } },
+          },
+        });
+      }
+      added++;
+    } catch (e) {
+      const detail = /"detail"\s*:\s*"([^"]*)"/.exec(String(e.message))?.[1] ?? 'refused';
+      refused.push(`${who}: ${detail}`);
     }
-    added++;
   }
   log(`testers: ${added} added, ${inGroup.size} already in "${GROUP_NAME}"`);
-  return { buildId: build.id, groupId: group.id, added };
+  for (const line of refused) log(`not added: ${line}`);
+  return { buildId: build.id, groupId: group.id, added, refused: refused.length };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
