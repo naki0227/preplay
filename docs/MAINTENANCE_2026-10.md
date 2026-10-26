@@ -139,7 +139,7 @@ curl -X POST https://preplay-five.vercel.app/api/generate \
 `appstore/metadata.yaml` で管理し、CD（`App Store metadata` ワークフロー）で反映する形にした。中身:
 
 - サポート URL・マーケティング URL → `https://enludus.com`（旧 `enludus.vercel.app` から変更）
-- プライバシーポリシー URL → `https://github.com/naki0227/preplay/blob/main/PRIVACY_POLICY.md`（この PR で内容も更新）
+- プライバシーポリシー URL → `https://enludus.com/products/preplay-privacy`（2026-10-26 に GitHub のページから移した）
 - 2.0.1 のリリースノート、説明文（公開中と同じ文面）
 
 オーナーの作業: [docs/RELEASE.md](RELEASE.md) の「最初に一度だけやること」（API キーを作り、GitHub Secrets に登録する）。そのあと、この PR をマージすれば反映される。

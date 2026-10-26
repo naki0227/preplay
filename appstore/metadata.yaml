@@ -19,7 +19,7 @@ version:
 appInfo:
   ja:
     subtitle: 道具なしで今すぐ遊べるゲーム集   # max 30 chars, searchable
-    privacyPolicyUrl: https://github.com/naki0227/preplay/blob/main/PRIVACY_POLICY.md
+    privacyPolicyUrl: https://enludus.com/products/preplay-privacy
 
 # Version information, per locale
 localizations:
