@@ -197,6 +197,13 @@ class PreplayController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Shows a fixed topic (screenshots must look the same on every run).
+  @visibleForTesting
+  void debugSetTopic(String topic) {
+    _currentTopic = topic;
+    notifyListeners();
+  }
+
   void rerollTopic() {
     if (_currentGame == null) return;
     _pickRandomTopic();

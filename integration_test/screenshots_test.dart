@@ -37,10 +37,10 @@ void main() {
     await _settle(tester);
     await binding.takeScreenshot('1_suggestion');
 
-    // 2. Playing with a topic and the timer running
+    // 2. Playing with a topic and the timer buttons. Fixed topic and no running
+    // timer, so the image is identical on every run (no needless re-upload).
     controller.playGame();
-    await _settle(tester);
-    await tester.tap(find.text('3分'));
+    controller.debugSetTopic('きのこ vs たけのこ');
     await _settle(tester);
     await binding.takeScreenshot('2_playing');
     controller.stopGame();
