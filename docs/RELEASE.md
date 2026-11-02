@@ -8,8 +8,9 @@
 | `Supabase`（`supabase.yml`） | `supabase/` を変える PR と、main への push、手動 | マイグレーションと公式の遊びの投入。PR では使い捨ての Postgres でテストし、本番 DB は dry run。main に入ると本番 DB に当てる |
 | `App Store screenshots`（`screenshots.yml`） | `integration_test/` などを変える PR と、手動 | iPhone 6.9 インチと iPad 13 インチのシミュレーターでアプリを動かしてスクリーンショットを撮り、`appstore/screenshots/` にコミットする |
 | `App Store metadata`（`appstore-metadata.yml`） | `appstore/` を変える PR と、main への push、手動 | `appstore/metadata.yaml` の内容を App Store Connect に反映する。PR では差分を表示するだけ（dry run）。main に入ると反映する |
+| `Submit for review`（`submit.yml`） | **手動のみ** | `metadata.yaml` のバージョンに、処理済みの一番新しいビルド（番号を指定も可）を付けて審査に提出する。「submit」にチェックを入れないと確認だけ（dry run） |
 
-**審査への提出は自動化していません。** 最後は App Store Connect の画面で「審査へ提出」を押します。
+**審査への提出は手動で動かすときだけ行います。** 「App のプライバシー」の回答は API で変えられないので、変えたときは提出の前に App Store Connect の画面で更新します。
 
 ## 最初に一度だけやること
 
