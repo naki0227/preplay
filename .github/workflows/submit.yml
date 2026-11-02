@@ -1,0 +1,42 @@
+name: Submit for review
+
+# Submits the version in appstore/metadata.yaml for App Review
+# (tools/appstore/submit.mjs). Manual only. Leave "submit" unchecked for a
+# dry run that only checks the version and picks the build.
+# App Privacy answers cannot be set through the API: update them in App Store
+# Connect before submitting.
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Build number (empty: the newest processed build of this version)'
+        required: false
+      submit:
+        description: 'Submit for review (unchecked: dry run)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: submit-for-review
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/appstore
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          BUILD: ${{ inputs.build }}
+          SUBMIT: ${{ inputs.submit && '--submit' || '' }}
+        run: node submit.mjs ../../appstore/metadata.yaml "$BUILD" $SUBMIT
