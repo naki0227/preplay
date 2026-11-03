@@ -1,7 +1,8 @@
-// App Store app preview (video), recorded on a simulator by
-// .github/workflows/app-preview.yml while this test plays the app in real time.
-// Each scene start is printed as "PREVIEW <epoch ms> <scene>" so
-// tool/make_preview.py can cut the recording and put captions on it.
+// Promotion video for social media, recorded on a simulator by
+// .github/workflows/promo-video.yml while this test plays the app in real time.
+// Scene starts and taps are printed as "PREVIEW <epoch ms> <name>" so
+// tool/make_promo.py can cut the recording, add captions and put the sound
+// effects on the taps.
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -21,13 +22,14 @@ void main() {
   // Draw every frame as on a real phone, so the recording is smooth.
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
-  testWidgets('App Store app preview', (tester) async {
+  testWidgets('promotion video', (tester) async {
     Future<void> hold(int ms) async {
       await Future<void>.delayed(Duration(milliseconds: ms));
       await tester.pump();
     }
 
     Future<void> tap(Finder finder, [int then = 700]) async {
+      _scene('tap');
       await tester.tap(finder.first);
       await hold(then);
     }
