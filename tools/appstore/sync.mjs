@@ -151,7 +151,7 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
       printChanges(`appStoreVersion ${versionString}`, live.attributes, vChanges, log);
       const liveLocs = await api('GET', `/v1/appStoreVersions/${live.id}/appStoreVersionLocalizations`);
       for (const [locale, entry] of Object.entries(meta.localizations || {})) {
-        const { screenshots, ...wanted } = entry || {};
+        const { screenshots, previews, ...wanted } = entry || {};
         const loc = liveLocs.data.find((l) => l.attributes.locale === locale);
         if (!loc) {
           log(`+ localization[${locale}]: will be created`);
@@ -163,6 +163,7 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
         printChanges(`localization[${locale}]`, base, changes, log);
         if (Object.keys(changes).length) pending++;
         if (screenshots) pending += await syncScreenshots(api, loc.id, locale, screenshots, opts);
+        if (previews) pending += await syncPreviews(api, loc.id, locale, previews, opts);
       }
       return pending;
     }
@@ -193,8 +194,8 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
 
   const vlocs = await api('GET', `/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`);
   for (const [locale, entry] of Object.entries(meta.localizations || {})) {
-    // screenshots are handled separately; everything else is a text attribute
-    const { screenshots, ...wanted } = entry || {};
+    // screenshots and previews are handled separately; everything else is a text attribute
+    const { screenshots, previews, ...wanted } = entry || {};
     let loc = vlocs.data.find((l) => l.attributes.locale === locale);
     if (!loc) {
       log(`+ localization[${locale}]: will be created`);
@@ -221,6 +222,7 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
       }
     }
     if (screenshots) pending += await syncScreenshots(api, loc.id, locale, screenshots, opts);
+    if (previews) pending += await syncPreviews(api, loc.id, locale, previews, opts);
   }
 
   return pending;
@@ -270,6 +272,14 @@ export async function snapshot(api, bundleId) {
           entry.screenshots[set.attributes.screenshotDisplayType] = shots.map((x) => x.attributes.fileName);
         }
       }
+      const previewSets = (await api('GET', `/v1/appStoreVersionLocalizations/${l.id}/appPreviewSets`)).data;
+      if (previewSets.length) {
+        entry.previews = {};
+        for (const set of previewSets) {
+          const videos = (await api('GET', `/v1/appPreviewSets/${set.id}/appPreviews`)).data;
+          entry.previews[set.attributes.previewType] = videos.map((x) => x.attributes.fileName);
+        }
+      }
       out.localizations[l.attributes.locale] = entry;
     }
   }
@@ -295,15 +305,36 @@ async function defaultUpload(op, data) {
   if (!res.ok) throw new Error(`upload ${op.method} -> ${res.status}`);
 }
 
-async function syncScreenshots(api, locId, locale, wantedSets, opts) {
+// Screenshots and app previews (videos) work the same way in the API, with
+// different names.
+const MEDIA = {
+  screenshots: {
+    sets: 'appScreenshotSets', items: 'appScreenshots', typeAttr: 'screenshotDisplayType',
+    setRel: 'appScreenshotSet', attrs: {}, waitTries: 30, waitMs: 2000,
+  },
+  previews: {
+    sets: 'appPreviewSets', items: 'appPreviews', typeAttr: 'previewType',
+    setRel: 'appPreviewSet', attrs: { mimeType: 'video/mp4' }, waitTries: 150, waitMs: 4000,
+  },
+};
+
+function syncScreenshots(api, locId, locale, wantedSets, opts) {
+  return syncMedia(MEDIA.screenshots, 'screenshots', api, locId, locale, wantedSets, opts);
+}
+
+function syncPreviews(api, locId, locale, wantedSets, opts) {
+  return syncMedia(MEDIA.previews, 'previews', api, locId, locale, wantedSets, opts);
+}
+
+async function syncMedia(m, kind, api, locId, locale, wantedSets, opts) {
   const { apply, log, baseDir = '.', upload = defaultUpload, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = opts;
   let pending = 0;
-  const sets = locId ? (await api('GET', `/v1/appStoreVersionLocalizations/${locId}/appScreenshotSets`)).data : [];
+  const sets = locId ? (await api('GET', `/v1/appStoreVersionLocalizations/${locId}/${m.sets}`)).data : [];
 
   for (const [displayType, entries] of Object.entries(wantedSets)) {
-    let set = sets.find((s) => s.attributes.screenshotDisplayType === displayType);
-    const existing = set ? (await api('GET', `/v1/appScreenshotSets/${set.id}/appScreenshots`)).data : [];
-    const label = `screenshots[${locale}][${displayType}]`;
+    let set = sets.find((s) => s.attributes[m.typeAttr] === displayType);
+    const existing = set ? (await api('GET', `/v1/${m.sets}/${set.id}/${m.items}`)).data : [];
+    const label = `${kind}[${locale}][${displayType}]`;
 
     // Each entry is a local file path (uploaded unless an identical image is
     // already there) or { keep: <file name> } to reuse an image that is
@@ -336,39 +367,39 @@ async function syncScreenshots(api, locId, locale, wantedSets, opts) {
     if (!apply) continue;
 
     if (!set) {
-      set = (await api('POST', '/v1/appScreenshotSets', {
+      set = (await api('POST', `/v1/${m.sets}`, {
         data: {
-          type: 'appScreenshotSets',
-          attributes: { screenshotDisplayType: displayType },
+          type: m.sets,
+          attributes: { [m.typeAttr]: displayType },
           relationships: { appStoreVersionLocalization: { data: { type: 'appStoreVersionLocalizations', id: locId } } },
         },
       })).data;
     }
 
     for (const f of toUpload) {
-      const reserved = (await api('POST', '/v1/appScreenshots', {
+      const reserved = (await api('POST', `/v1/${m.items}`, {
         data: {
-          type: 'appScreenshots',
-          attributes: { fileName: f.fileName, fileSize: f.data.length },
-          relationships: { appScreenshotSet: { data: { type: 'appScreenshotSets', id: set.id } } },
+          type: m.items,
+          attributes: { fileName: f.fileName, fileSize: f.data.length, ...m.attrs },
+          relationships: { [m.setRel]: { data: { type: m.sets, id: set.id } } },
         },
       })).data;
       for (const op of reserved.attributes.uploadOperations || []) await upload(op, f.data);
-      await api('PATCH', `/v1/appScreenshots/${reserved.id}`, {
-        data: { type: 'appScreenshots', id: reserved.id, attributes: { uploaded: true, sourceFileChecksum: f.md5 } },
+      await api('PATCH', `/v1/${m.items}/${reserved.id}`, {
+        data: { type: m.items, id: reserved.id, attributes: { uploaded: true, sourceFileChecksum: f.md5 } },
       });
-      // Wait for Apple to process the image so size errors show up here.
-      for (let i = 0; i < 30; i++) {
-        const state = (await api('GET', `/v1/appScreenshots/${reserved.id}`)).data.attributes.assetDeliveryState?.state;
+      // Wait for Apple to process the file so size / format errors show up here.
+      for (let i = 0; i < m.waitTries; i++) {
+        const state = (await api('GET', `/v1/${m.items}/${reserved.id}`)).data.attributes.assetDeliveryState?.state;
         if (state === 'COMPLETE') break;
-        if (state === 'FAILED') throw new Error(`${label}: Apple rejected ${f.path} (check the image size for ${displayType})`);
-        await sleep(2000);
+        if (state === 'FAILED') throw new Error(`${label}: Apple rejected ${f.path} (check the size and format for ${displayType})`);
+        await sleep(m.waitMs);
       }
       f.keepId = reserved.id;
     }
-    for (const e of toDelete) await api('DELETE', `/v1/appScreenshots/${e.id}`);
-    await api('PATCH', `/v1/appScreenshotSets/${set.id}/relationships/appScreenshots`, {
-      data: wanted.map((w) => ({ type: 'appScreenshots', id: w.keepId })),
+    for (const e of toDelete) await api('DELETE', `/v1/${m.items}/${e.id}`);
+    await api('PATCH', `/v1/${m.sets}/${set.id}/relationships/${m.items}`, {
+      data: wanted.map((w) => ({ type: m.items, id: w.keepId })),
     });
   }
   return pending;

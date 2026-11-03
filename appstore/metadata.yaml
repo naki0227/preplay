@@ -49,6 +49,11 @@ localizations:
     # Taken by CI (.github/workflows/screenshots.yml) on iPhone 6.9" and iPad 13"
     # simulators. App Store scales the 6.9" set for smaller iPhones, so the
     # old 6.5" set is cleared.
+    # App preview videos (same patch rules as screenshots). Only for a version
+    # that is not live yet, e.g.:
+    # previews:
+    #   IPHONE_67:
+    #     - previews/ja/iphone69/preview.mp4
     screenshots:
       APP_IPHONE_67:
         - screenshots/ja/iphone69/1_suggestion.png

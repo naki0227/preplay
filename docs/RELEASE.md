@@ -7,6 +7,7 @@
 | `TestFlight`（`testflight.yml`） | **手動のみ**（`iOS release` のアップロード後にも同じ処理が自動で動く） | ビルドの処理が終わるのを待ち、輸出コンプライアンスに回答（HTTPS だけなので対象外）し、内部テストグループ「内部テスト」（すべてのビルド・App Store Connect のチーム全員）を用意する。これで TestFlight アプリに届く |
 | `Supabase`（`supabase.yml`） | `supabase/` を変える PR と、main への push、手動 | マイグレーションと公式の遊びの投入。PR では使い捨ての Postgres でテストし、本番 DB は dry run。main に入ると本番 DB に当てる |
 | `App Store screenshots`（`screenshots.yml`） | `integration_test/` などを変える PR と、手動 | iPhone 6.9 インチと iPad 13 インチのシミュレーターでアプリを動かしてスクリーンショットを撮り、`appstore/screenshots/` にコミットする |
+| `App Store app preview`（`app-preview.yml`） | `integration_test/preview_test.dart` などを変える PR と、手動 | iPhone 6.9 インチのシミュレーターでアプリを動かして録画し、字幕を付けて 886×1920・30 fps・30 秒以内の動画（`appstore/previews/ja/iphone69/preview.mp4`）にしてコミットする。毎回少し違う動画になるので、アプリを変えるたびには撮らない |
 | `App Store metadata`（`appstore-metadata.yml`） | `appstore/` を変える PR と、main への push、手動 | `appstore/metadata.yaml` の内容を App Store Connect に反映する。PR では差分を表示するだけ（dry run）。main に入ると反映する |
 | `Submit for review`（`submit.yml`） | **手動のみ** | `metadata.yaml` のバージョンに、処理済みの一番新しいビルド（番号を指定も可）を付けて審査に提出する。「submit」にチェックを入れないと確認だけ（dry run） |
 
@@ -47,6 +48,12 @@ https://github.com/naki0227/preplay/settings/secrets/actions を開き、**「Re
    - まず「upload」のチェックなしで実行して、ビルドが通るか確かめる（IPA は Artifacts に 7 日残ります）
    - 通ったら「upload」にチェックを入れて実行する。ビルド番号は実行した日時（UTC）から自動で決まります
 6. App Store Connect で、アップロードしたビルドをバージョンに選び、「審査へ提出」を押す
+
+## App プレビュー（動画）
+
+- 流れと字幕は `integration_test/preview_test.dart`（操作と場面）と `tool/make_preview.py`（場面ごとの字幕）に書いてある
+- Actions →「App Store app preview」→ Run workflow で撮り直せる。Artifacts の `app-preview` に動画と確認用の静止画が残る
+- ストアに載せるには `appstore/metadata.yaml` の `localizations.ja.previews.IPHONE_67` に動画を並べる（スクリーンショットと同じ差分更新）。公開中のバージョンには載せられないので、次のバージョンを作るときに書き足す
 
 ## スクリーンショット
 
