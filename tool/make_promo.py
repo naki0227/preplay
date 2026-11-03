@@ -26,8 +26,8 @@ FONT_BOLD = ROOT / 'assets/fonts/MPLUSRounded1c-Bold.ttf'
 ICON = ROOT / 'ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png'
 
 W, H = 1080, 1920
-BAND = 400                 # caption area at the top
-APP_H = 1440               # app footage height
+BAND = 370                 # caption area at the top
+APP_H = 1490               # app footage height
 RADIUS = 56
 TOP, BOTTOM = (255, 244, 226), (255, 196, 140)   # gradient: cream -> soft orange
 INK = '0x2C3E50'

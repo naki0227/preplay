@@ -44,9 +44,14 @@ void main() {
 
     // 1. A game right away; "次" shows another one.
     _scene('intro');
-    await hold(1600);
-    await tap(find.text('次'), 1300);
-    await tap(find.text('次'), 1300);
+    await hold(1500);
+    // "次" would show the short detecting screen; switch cards directly so
+    // the opening keeps moving (with the tap sound on each change).
+    for (final id in ['first_impression', 'black_stories', 'gesture_game']) {
+      _scene('tap');
+      await controller.selectGame(_game(id));
+      await hold(850);
+    }
 
     // 2. Word wolf: deal roles and topics by passing the phone.
     _scene('deal');
@@ -65,7 +70,7 @@ void main() {
 
     // 3. Find a game by group size and time.
     _scene('filter');
-    await tap(find.byIcon(CupertinoIcons.square_favorites_alt), 800);
+    await tap(find.byIcon(CupertinoIcons.square_favorites_alt), 450);
     await tap(find.text('すべて'), 800);
     await tap(find.text('3〜5人'), 800);
     await tap(find.text('5分以内'), 1000);
