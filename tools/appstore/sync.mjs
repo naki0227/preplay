@@ -129,8 +129,12 @@ export async function sync(api, meta, opts = {}) {
 // Creates the version if needed and syncs its localizations.
 // App info only becomes editable once a new version exists, so this runs first.
 async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
-  const { apply, log } = opts;
+  const { log } = opts;
+  let { apply } = opts;
   let pending = 0;
+  // A live (or in-review) version cannot be edited. That is fine as long as
+  // the YAML still matches it; only real changes need a new version.
+  let locked = null;
 
   const versions = await api(
     'GET',
@@ -178,7 +182,9 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
   } else {
     const state = version.attributes.appStoreState ?? version.attributes.appVersionState;
     if (!EDITABLE_VERSION_STATES.has(state)) {
-      throw new Error(`Version ${versionString} is ${state} and cannot be edited. Bump version.versionString.`);
+      locked = state;
+      apply = false;
+      opts = { ...opts, apply: false };
     }
     const changes = diff(version.attributes, versionAttrs);
     printChanges(`appStoreVersion ${versionString}`, version.attributes, changes, log);
@@ -225,6 +231,12 @@ async function syncVersion(api, app, versionString, versionAttrs, meta, opts) {
     if (previews) pending += await syncPreviews(api, loc.id, locale, previews, opts);
   }
 
+  if (locked) {
+    if (pending) {
+      throw new Error(`Version ${versionString} is ${locked} and cannot be edited. Bump version.versionString to change it.`);
+    }
+    log(`= appStoreVersion ${versionString} is ${locked}; it already matches, nothing to change`);
+  }
   return pending;
 }
 

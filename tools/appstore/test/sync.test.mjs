@@ -287,3 +287,34 @@ test('previews: a video is uploaded as video/mp4 into a new preview set; unchang
   await sync(api, meta, { apply: true, baseDir: vid.dir, log: () => {}, upload: async () => assert.fail('must not upload'), sleep: async () => {} });
   assert.ok(calls.every((c) => c.method === 'GET'));
 });
+
+function liveApi(keywords) {
+  const calls = [];
+  const api = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (path.startsWith('/v1/apps?')) return { data: [{ id: 'APP' }] };
+    if (path.startsWith('/v1/apps/APP/appStoreVersions')) {
+      return { data: [{ id: 'VER', attributes: { appStoreState: 'READY_FOR_SALE', copyright: '2026 Enludus' } }] };
+    }
+    if (path === '/v1/appStoreVersions/VER/appStoreVersionLocalizations') {
+      return { data: [{ id: 'VLOC', attributes: { locale: 'ja', keywords } }] };
+    }
+    if (path.startsWith('/v1/apps/APP/appInfos')) return { data: [] };
+    return { data: [] };
+  };
+  return { api, calls };
+}
+
+test('a live version that already matches the YAML passes without writing', async () => {
+  const { api, calls } = liveApi('あそび');
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1', copyright: '2026 Enludus' }, localizations: { ja: { keywords: 'あそび' } } };
+  await sync(api, meta, { apply: true, log: () => {} });
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+test('changing a live version fails and asks for a new version', async () => {
+  const { api, calls } = liveApi('あそび');
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { keywords: '新しい' } } };
+  await assert.rejects(sync(api, meta, { apply: true, log: () => {} }), /READY_FOR_SALE and cannot be edited/);
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
