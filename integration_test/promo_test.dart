@@ -42,7 +42,18 @@ void main() {
     await controller.selectGame(_game('word_wolf'));
     await hold(1500); // let the recorder settle before the first scene
 
-    // 1. A game right away; "次" shows another one.
+    // Sync flash: one magenta frame that tool/make_promo.py finds in the
+    // recording, so captions and sounds line up with the video exactly.
+    final overlay = tester.state<NavigatorState>(find.byType(Navigator).first).overlay!;
+    final flash = OverlayEntry(builder: (_) => const ColoredBox(color: Color(0xFFFF00FF)));
+    overlay.insert(flash);
+    await tester.pump();
+    _scene('sync');
+    await hold(400);
+    flash.remove();
+    await hold(600);
+
+    // 1. A game right away, then a few more.
     _scene('intro');
     await hold(1500);
     // "次" would show the short detecting screen; switch cards directly so

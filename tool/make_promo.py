@@ -1,10 +1,11 @@
 """Turns the raw simulator recording into a vertical promotion video for
 social media (TikTok, Instagram Reels, YouTube Shorts, X).
 
-    python3 tool/make_promo.py RAW.mp4 RECORD_START_EPOCH_MS DRIVE.log OUT.mp4
+    python3 tool/make_promo.py RAW.mp4 DRIVE.log OUT.mp4
 
 Reads the scene and tap times printed by integration_test/promo_test.dart
-("PREVIEW <epoch ms> <name>"), puts the app with rounded corners on a warm
+("PREVIEW <epoch ms> <name>") and lines them up with the recording through
+the magenta "sync" flash the test shows before the first scene. Puts the app with rounded corners on a warm
 gradient with a big caption per scene, ends with a card (icon, name,
 "App Storeで無料"), and adds music and tap sounds from tool/make_bgm.py.
 1080x1920, H.264 30 fps, AAC stereo.
@@ -42,16 +43,41 @@ CAPTIONS = {
 }
 
 
-def parse(log_text, record_start_ms):
+def parse(log_text):
+    """Returns scenes and taps in seconds from the first scene, and the
+    first scene's time after the sync flash."""
     events = [(int(ms), name) for ms, name in re.findall(r'PREVIEW (\d{13}) (\w+)', log_text)]
-    scenes = [e for e in events if e[1] != 'tap']
-    if not scenes or scenes[-1][1] != 'done' or 'end' not in [n for _, n in scenes]:
+    sync = [ms for ms, name in events if name == 'sync']
+    scenes = [e for e in events if e[1] not in ('tap', 'sync')]
+    if not sync or not scenes or scenes[-1][1] != 'done' or 'end' not in [n for _, n in scenes]:
         sys.exit('no complete PREVIEW scene list in the drive log')
     first = scenes[0][0]
     rel = lambda ms: (ms - first) / 1000  # noqa: E731
     timeline = [(rel(ms), name) for ms, name in scenes]
     taps = [rel(ms) for ms, name in events if name == 'tap' and ms >= first]
-    return timeline, taps, (first - record_start_ms) / 1000
+    return timeline, taps, (first - sync[0]) / 1000
+
+
+def find_flash(raw):
+    """Time of the first magenta frame in the recording (U and V both high)."""
+    with tempfile.NamedTemporaryFile('r', suffix='.txt') as stats:
+        subprocess.run([
+            'ffmpeg', '-loglevel', 'error', '-i', raw,
+            '-vf', f'scale=64:-2,crop=32:32,signalstats,metadata=print:file={stats.name}',
+            '-f', 'null', '-',
+        ], check=True)
+        t = None
+        for line in stats.read().splitlines():
+            if line.startswith('frame:'):
+                t = float(re.search(r'pts_time:([\d.]+)', line).group(1))
+                u = v = 0.0
+            elif 'signalstats.UAVG=' in line:
+                u = float(line.split('=')[1])
+            elif 'signalstats.VAVG=' in line:
+                v = float(line.split('=')[1])
+                if u > 180 and v > 190:
+                    return t
+    sys.exit('sync flash not found in the recording')
 
 
 def gradient():
@@ -103,10 +129,9 @@ def end_card():
     return img.convert('RGB')
 
 
-def build(raw, record_start_ms, log_path, out):
-    timeline, taps, offset = parse(Path(log_path).read_text(errors='replace'), int(record_start_ms))
-    if offset < 0:
-        sys.exit(f'scene starts {offset:.1f}s before the recording')
+def build(raw, log_path, out):
+    timeline, taps, after_sync = parse(Path(log_path).read_text(errors='replace'))
+    offset = find_flash(raw) + after_sync
     footage = next(t for t, n in timeline if n == 'end')
     total = min(footage + END_SECONDS, MAX_SECONDS)
     footage = total - END_SECONDS
@@ -171,4 +196,4 @@ def build(raw, record_start_ms, log_path, out):
 
 
 if __name__ == '__main__':
-    build(*sys.argv[1:5])
+    build(*sys.argv[1:4])

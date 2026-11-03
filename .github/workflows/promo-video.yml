@@ -51,7 +51,6 @@ jobs:
             xcrun simctl io "$udid" recordVideo --codec=h264 --force build/promo/raw.mp4 2> build/promo/recorder.log &
             rec=$!
             for i in $(seq 1 50); do grep -q "Recording started" build/promo/recorder.log && break; sleep 0.2; done
-            python3 -c 'import time; print(int(time.time() * 1000))' > build/promo/start_ms
             ok=false
             if perl -e 'alarm shift; exec @ARGV' 900 \
                  flutter drive \
@@ -92,8 +91,7 @@ jobs:
           python3 -m pip install --quiet numpy pillow
       - name: Compose
         run: |
-          python3 tool/make_promo.py build/promo/raw.mp4 "$(cat build/promo/start_ms)" \
-            build/promo/drive.log promo/preplay_promo.mp4
+          python3 tool/make_promo.py build/promo/raw.mp4 build/promo/drive.log promo/preplay_promo.mp4
           ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size \
             -of compact promo/preplay_promo.mp4
           mkdir -p build/frames
