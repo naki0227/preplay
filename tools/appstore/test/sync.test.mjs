@@ -215,12 +215,15 @@ test('snapshot reads current values in metadata.yaml shape without writing', asy
   const wrapped = async (m, p, b) => {
     if (p === '/v1/appStoreVersionLocalizations/LIVELOC/appScreenshotSets') return { data: [{ id: 'S', attributes: { screenshotDisplayType: 'APP_IPHONE_67' } }] };
     if (p === '/v1/appScreenshotSets/S/appScreenshots') return { data: [{ id: 'X', attributes: { fileName: '1.png' } }] };
+    if (p === '/v1/appStoreVersionLocalizations/LIVELOC/appPreviewSets') return { data: [{ id: 'P', attributes: { previewType: 'IPHONE_67' } }] };
+    if (p === '/v1/appPreviewSets/P/appPreviews') return { data: [{ id: 'Y', attributes: { fileName: 'preview.mp4' } }] };
     return api(m, p, b);
   };
   const snap = await snapshot(wrapped, 'com.preplay.preplay');
   assert.equal(snap.version.versionString, '1.0');
   assert.equal(snap.localizations.ja.supportUrl, 'https://enludus.vercel.app');
   assert.deepEqual(snap.localizations.ja.screenshots, { APP_IPHONE_67: ['1.png'] });
+  assert.deepEqual(snap.localizations.ja.previews, { IPHONE_67: ['preview.mp4'] });
   assert.equal(snap.appInfo.ja.name, 'Preplay');
   assert.ok(calls.every((c) => c.method === 'GET'));
 });
@@ -247,4 +250,71 @@ test('screenshots: an empty list clears that display type', async () => {
   await sync(api, meta, { apply: true, log: () => {} });
   const deleted = calls.filter((c) => c.method === 'DELETE').map((c) => c.path);
   assert.deepEqual(deleted, ['/v1/appScreenshots/OLD0', '/v1/appScreenshots/OLD1']);
+});
+
+test('previews: a video is uploaded as video/mp4 into a new preview set; unchanged is not re-uploaded', async () => {
+  const calls = [];
+  let existing = [];
+  const api = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (path.startsWith('/v1/apps?')) return { data: [{ id: 'APP' }] };
+    if (path.startsWith('/v1/apps/APP/appStoreVersions')) return { data: [{ id: 'VER', attributes: { appStoreState: 'PREPARE_FOR_SUBMISSION' } }] };
+    if (path === '/v1/appStoreVersions/VER/appStoreVersionLocalizations') return { data: [{ id: 'VLOC', attributes: { locale: 'ja' } }] };
+    if (path === '/v1/appStoreVersionLocalizations/VLOC/appPreviewSets') return { data: existing.length ? [{ id: 'PS', attributes: { previewType: 'IPHONE_67' } }] : [] };
+    if (path === '/v1/appPreviewSets/PS/appPreviews') return { data: existing };
+    if (method === 'POST' && path === '/v1/appPreviewSets') return { data: { id: 'PS' } };
+    if (method === 'POST' && path === '/v1/appPreviews') {
+      return { data: { id: 'V1', attributes: { uploadOperations: [{ method: 'PUT', url: 'https://upload.invalid', offset: 0, length: body.data.attributes.fileSize, requestHeaders: [] }] } } };
+    }
+    if (method === 'GET' && path === '/v1/appPreviews/V1') return { data: { attributes: { assetDeliveryState: { state: 'COMPLETE' } } } };
+    if (method === 'PATCH' || method === 'DELETE') return null;
+    throw new Error(`unexpected ${method} ${path}`);
+  };
+  const vid = tempImages('video-bytes');
+  const meta = { bundleId: 'x', version: { versionString: '2.0.2' }, localizations: { ja: { previews: { IPHONE_67: [vid.names[0]] } } } };
+  const uploads = [];
+  await sync(api, meta, { apply: true, baseDir: vid.dir, log: () => {}, upload: async (op, data) => uploads.push(data.toString()), sleep: async () => {} });
+  assert.deepEqual(uploads, ['video-bytes']);
+  const set = calls.find((c) => c.method === 'POST' && c.path === '/v1/appPreviewSets');
+  assert.equal(set.body.data.attributes.previewType, 'IPHONE_67');
+  const reserve = calls.find((c) => c.method === 'POST' && c.path === '/v1/appPreviews');
+  assert.equal(reserve.body.data.attributes.mimeType, 'video/mp4');
+  assert.equal(reserve.body.data.relationships.appPreviewSet.data.id, 'PS');
+  assert.ok(calls.find((c) => c.path === '/v1/appPreviewSets/PS/relationships/appPreviews'));
+
+  calls.length = 0;
+  existing = [{ id: 'V1', attributes: { sourceFileChecksum: vid.md5[0], fileName: '1.png' } }];
+  await sync(api, meta, { apply: true, baseDir: vid.dir, log: () => {}, upload: async () => assert.fail('must not upload'), sleep: async () => {} });
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+function liveApi(keywords) {
+  const calls = [];
+  const api = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (path.startsWith('/v1/apps?')) return { data: [{ id: 'APP' }] };
+    if (path.startsWith('/v1/apps/APP/appStoreVersions')) {
+      return { data: [{ id: 'VER', attributes: { appStoreState: 'READY_FOR_SALE', copyright: '2026 Enludus' } }] };
+    }
+    if (path === '/v1/appStoreVersions/VER/appStoreVersionLocalizations') {
+      return { data: [{ id: 'VLOC', attributes: { locale: 'ja', keywords } }] };
+    }
+    if (path.startsWith('/v1/apps/APP/appInfos')) return { data: [] };
+    return { data: [] };
+  };
+  return { api, calls };
+}
+
+test('a live version that already matches the YAML passes without writing', async () => {
+  const { api, calls } = liveApi('あそび');
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1', copyright: '2026 Enludus' }, localizations: { ja: { keywords: 'あそび' } } };
+  await sync(api, meta, { apply: true, log: () => {} });
+  assert.ok(calls.every((c) => c.method === 'GET'));
+});
+
+test('changing a live version fails and asks for a new version', async () => {
+  const { api, calls } = liveApi('あそび');
+  const meta = { bundleId: 'x', version: { versionString: '2.0.1' }, localizations: { ja: { keywords: '新しい' } } };
+  await assert.rejects(sync(api, meta, { apply: true, log: () => {} }), /READY_FOR_SALE and cannot be edited/);
+  assert.ok(calls.every((c) => c.method === 'GET'));
 });

@@ -1,0 +1,117 @@
+name: Promotion video
+
+# Vertical promotion video for social media (TikTok, Reels, Shorts, X).
+# Records integration_test/promo_test.dart on an iPhone 6.9" simulator, then
+# tool/make_promo.py adds captions, an end card, music and tap sounds.
+# The video is kept as the "promo-video" artifact and committed to
+# promo/preplay_promo.mp4 on the same branch.
+# A recording is never byte-identical, so this runs only when the video
+# itself changes or by hand (not on every app change).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'integration_test/promo_test.dart'
+      - 'tool/make_promo.py'
+      - 'tool/make_bgm.py'
+      - '.github/workflows/promo-video.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promo-video-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+      - run: flutter pub get
+
+      - name: Record
+        run: |
+          set -euo pipefail
+          mkdir -p build/promo
+          udid=$(python3 tool/pick_simulator.py "Pro Max")
+          for try in 1 2 3; do
+            xcrun simctl shutdown all || true
+            xcrun simctl boot "$udid"
+            xcrun simctl bootstatus "$udid" -b > /dev/null
+            rm -f build/promo/raw.mp4
+            xcrun simctl io "$udid" recordVideo --codec=h264 --force build/promo/raw.mp4 2> build/promo/recorder.log &
+            rec=$!
+            for i in $(seq 1 50); do grep -q "Recording started" build/promo/recorder.log && break; sleep 0.2; done
+            ok=false
+            if perl -e 'alarm shift; exec @ARGV' 900 \
+                 flutter drive \
+                   --driver=test_driver/integration_test.dart \
+                   --target=integration_test/promo_test.dart \
+                   --dart-define-from-file=config/app_config.json \
+                   -d "$udid" > build/promo/drive.log 2>&1; then
+              grep -q "PREVIEW [0-9]* done" build/promo/drive.log && ok=true
+            fi
+            kill -INT "$rec"; wait "$rec" || true
+            $ok && break
+            echo "::warning::recording failed (try $try)"
+            tail -n 40 build/promo/drive.log || true
+            [ "$try" = 3 ] && { echo "::error::recording failed 3 times"; exit 1; }
+          done
+          grep "PREVIEW" build/promo/drive.log | grep -v " tap$"
+          ls -l build/promo/raw.mp4
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: promo-raw
+          path: build/promo
+          retention-days: 7
+
+  compose:
+    needs: record
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: promo-raw
+          path: build/promo
+      - run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          python3 -m pip install --quiet numpy pillow
+      - name: Compose
+        run: |
+          python3 tool/make_promo.py build/promo/raw.mp4 build/promo/drive.log promo/preplay_promo.mp4
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size \
+            -of compact promo/preplay_promo.mp4
+          mkdir -p build/frames
+          for t in 1 6 14 20 26; do
+            ffmpeg -loglevel error -y -ss "$t" -i promo/preplay_promo.mp4 -frames:v 1 -vf scale=540:-1 "build/frames/$t.png" || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: promo-video
+          path: |
+            promo
+            build/frames
+          retention-days: 30
+      - name: Commit video
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          git add promo
+          if git diff --cached --quiet; then echo "Video unchanged."; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Update promotion video"
+          git pull --rebase origin "$BRANCH"
+          git push origin "HEAD:$BRANCH"
